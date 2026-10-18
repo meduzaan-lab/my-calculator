@@ -1,0 +1,1421 @@
+﻿<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Калькулятор упреждений</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Макет: слева короткая панель параметров, справа сложность выстрела, вся траектория сверху и сбоку, лента сложности по ходу полёта, мишень. */
+:root {
+  --bg: #E7ECEF;
+  --panel: #F7F9FA;
+  --ink: #13232B;
+  --ink2: #4D616B;
+  --line: #C6D0D6;
+  --accent: #0D6784;
+  --clay: #E0540E;
+  --good: #1F8A3E;
+  --warn: #A86F00;
+  --bad: #C42B4A;
+  --lv0: #2F9E4F; --lv1: #6BAE3E; --lv2: #A5B02F; --lv3: #CFA422; --lv4: #E48A1D;
+  --lv5: #E1651F; --lv6: #D43F2F; --lv7: #A81F44; --lv8: #6E7B85;
+  --f-head: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D171C; --panel: #15232A; --ink: #E5EDF0; --ink2: #98AEB8; --line: #2A3D46;
+    --accent: #55B8D8; --clay: #FF7B30; --good: #4CC76F; --warn: #F2C14E; --bad: #FF6D88;
+    --lv0: #4CC76F; --lv1: #86CB58; --lv2: #BFC84B; --lv3: #EAC03E; --lv4: #F59C36;
+    --lv5: #F67B39; --lv6: #F45B4C; --lv7: #EF5A7C; --lv8: #8C9BA5;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D171C; --panel: #15232A; --ink: #E5EDF0; --ink2: #98AEB8; --line: #2A3D46;
+  --accent: #55B8D8; --clay: #FF7B30; --good: #4CC76F; --warn: #F2C14E; --bad: #FF6D88;
+  --lv0: #4CC76F; --lv1: #86CB58; --lv2: #BFC84B; --lv3: #EAC03E; --lv4: #F59C36;
+  --lv5: #F67B39; --lv6: #F45B4C; --lv7: #EF5A7C; --lv8: #8C9BA5;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--f-body); font-size: 15px; line-height: 1.45;
+  padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1200px; margin: 0 auto; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 16px; }
+h1 { font-family: var(--f-head); font-weight: 700; font-size: 34px; letter-spacing: .01em; margin: 0; line-height: 1; text-wrap: balance; }
+header p { margin: 0; color: var(--ink2); }
+
+.app { display: grid; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.visuals { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+@media (max-width: 640px) { .app { grid-template-columns: minmax(0, 1fr); } .visuals { order: -1; } }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
+.controls { padding: 14px 16px 10px; min-width: 0; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; min-width: 0; }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+label, .lbl { font-weight: 500; }
+output { font-family: var(--f-mono); font-size: 13px; color: var(--accent); white-space: nowrap; }
+input[type=range] { width: 100%; accent-color: var(--accent); margin: 2px 0; height: 24px; }
+select { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 7px 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip, .seg button, .btn, .linkbtn { font: inherit; font-weight: 500; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; cursor: pointer; line-height: 1.2; }
+.chip { font-size: 13px; padding: 5px 8px; }
+.chip[aria-pressed=true], .seg button[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; }
+.seg button { border-radius: 0; padding: 8px 6px; }
+.seg button:first-child { border-radius: 4px 0 0 4px; }
+.seg button:last-child { border-radius: 0 4px 4px 0; border-left: 0; }
+.btn { font-family: var(--f-head); font-size: 20px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; background: var(--clay); border-color: var(--clay); color: #fff; padding: 9px 14px; width: 100%; }
+.btn:hover { filter: brightness(1.06); }
+.linkbtn { font-size: 13px; padding: 4px 9px; background: var(--accent); border-color: var(--accent); color: var(--bg); }
+:where(button, select, input, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { color: var(--ink2); font-size: 13px; margin: 0; }
+.scale { display: flex; justify-content: space-between; gap: 8px; font-family: var(--f-mono); font-size: 11.5px; color: var(--ink2); }
+.eyebrow { font-family: var(--f-head); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; font-size: 14px; color: var(--ink2); }
+
+.controls { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.controls .presets { padding-bottom: 4px; }
+details.sec .eyebrow.grp.first { border-top: 0; padding-top: 0; margin-top: 0; }
+details.sec.sub { margin-top: 4px; }
+details.sec > summary:hover { color: var(--ink); }
+@media (max-width: 640px) { .controls { position: static; max-height: none; overflow: visible; } }
+details.sec { border-top: 1px solid var(--line); padding: 0; }
+details.sec > summary { cursor: pointer; padding: 11px 0; font-family: var(--f-head); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; font-size: 14px; color: var(--ink2); list-style: none; display: flex; justify-content: space-between; align-items: center; }
+details.sec > summary::-webkit-details-marker { display: none; }
+details.sec > summary::after { content: "+"; font-family: var(--f-mono); font-size: 16px; }
+details.sec[open] > summary::after { content: "–"; }
+details.sec > .body { padding: 2px 0 6px; }
+
+/* Сложность выстрела */
+.hero { padding: 16px 20px; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px 28px; }
+@media (max-width: 980px) { .hero { grid-template-columns: minmax(0, 1fr); } }
+.lvlname { font-family: var(--f-head); font-weight: 700; font-size: 58px; line-height: 1; margin: 2px 0 6px; text-wrap: balance; }
+.meter { display: flex; gap: 3px; align-items: flex-end; height: 18px; max-width: 460px; margin: 6px 0 10px; }
+.meter span { flex: 1; height: 8px; border-radius: 2px; background: var(--lvc); opacity: .3; }
+.meter span.on { height: 18px; opacity: 1; }
+.lvlsub { color: var(--ink); max-width: 46ch; }
+.aim { font-family: var(--f-head); font-weight: 700; font-size: 44px; line-height: 1; margin: 2px 0 6px; font-variant-numeric: tabular-nums; }
+.aimsub { font-family: var(--f-mono); font-size: 13.5px; color: var(--ink2); }
+.best { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding-top: 12px; border-top: 1px solid var(--line); }
+.best .t { flex: 1 1 280px; min-width: 0; }
+
+.stage { padding: 10px 10px 8px; }
+.stagehead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; margin: 2px 4px 6px; }
+.stagehead .sum { font-family: var(--f-mono); font-size: 12.5px; color: var(--ink2); }
+canvas { display: block; width: 100%; }
+#scene { height: 480px; touch-action: none; cursor: grab; }
+.camrow { align-items: center; margin: 8px 4px 0; }
+#ribbon { height: 112px; cursor: pointer; touch-action: pan-y; }
+#ribbon.ro { cursor: default; }
+@media (max-width: 560px) { #scene { height: 400px; } }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 6px 4px 0; font-size: 13px; color: var(--ink2); }
+.legend .grad { display: inline-flex; align-items: center; gap: 6px; }
+.legend .grad i { display: inline-block; width: 18px; height: 8px; border-radius: 2px; background: var(--lvc); margin: 0; }
+.legend .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.momentrow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; margin: 4px 6px 4px; }
+.momentrow .t { font-family: var(--f-mono); font-size: 13px; color: var(--ink); }
+
+.lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 980px) { .lower { grid-template-columns: minmax(0, 1fr); } }
+#zoom { aspect-ratio: 1 / 1; max-width: 100%; }
+.verdict { margin: 8px 4px 6px; font-weight: 600; min-height: 1.45em; }
+.verdict.good { color: var(--good); } .verdict.warn { color: var(--warn); } .verdict.bad { color: var(--bad); }
+.zoomtools { padding: 4px 6px 8px; }
+dl.stats { margin: 0; padding: 4px 16px 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 14px; }
+dl.stats > div { display: contents; }
+dl.stats dt, dl.stats dd { margin: 0; padding: 7px 0; border-bottom: 1px solid var(--line); }
+dl.stats dt { color: var(--ink2); }
+dl.stats dd { font-family: var(--f-mono); font-size: 13.5px; text-align: right; font-variant-numeric: tabular-nums; }
+dl.stats > div:last-child dt, dl.stats > div:last-child dd { border-bottom: 0; }
+.note { margin: 0; padding: 4px 16px 12px; font-size: 13px; color: var(--ink2); }
+.note.alert { color: var(--bad); font-weight: 500; }
+.calc > details { padding: 0 16px; border-top: 1px solid var(--line); }
+.calc > details > summary { cursor: pointer; padding: 11px 0; font-family: var(--f-head); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; font-size: 14px; color: var(--ink2); }
+.calc > details dl.stats { padding: 0 0 8px; }
+
+details.assume { margin-top: 14px; padding: 12px 16px; }
+details.assume summary { cursor: pointer; font-family: var(--f-head); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; font-size: 14px; color: var(--ink2); }
+details.assume ul { margin: 10px 0 0; padding-left: 18px; color: var(--ink2); max-width: 78ch; }
+details.assume li { margin-bottom: 4px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+.eyebrow.grp { margin: 4px 0 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+#pad { aspect-ratio: 1 / 1; max-width: 100%; touch-action: none; cursor: crosshair; border: 1px solid var(--line); border-radius: 4px; margin: 4px 0; }
+.xy { display: grid; grid-template-columns: auto 1fr 1fr; gap: 6px 8px; align-items: center; margin: 6px 0 12px; }
+.xy label { display: flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: 13px; }
+.xy input { width: 100%; min-width: 0; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 5px 6px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Калькулятор упреждений</h1>
+    <p>Задайте полёт тарелки и посмотрите, где стрелять легче всего</p>
+  </header>
+
+  <div class="app">
+    <form class="panel controls" id="form" onsubmit="return false">
+      <div class="field presets">
+        <span class="lbl">Готовые полёты</span>
+        <div class="chips" id="presets" role="group" aria-label="Готовые полёты"></div>
+      </div>
+
+      <details class="sec" open>
+        <summary>1. Заряд и ружьё</summary>
+        <div class="body">
+          <div class="field"><label for="choke">Чок</label><select id="choke"></select></div>
+          <div class="field"><label for="shot">Дробь</label><select id="shot"></select></div>
+          <div class="field"><label for="mass">Навеска, г</label><select id="mass"><option>24</option><option>28</option><option>32</option><option>36</option></select></div>
+          <div class="field">
+            <div class="row"><label for="v0">Начальная скорость дроби</label><output id="v0Out" for="v0"></output></div>
+            <input type="range" id="v0" min="360" max="420" step="5" value="400">
+          </div>
+          <div class="field">
+            <div class="row"><label for="gun">Посадка ружья: бьёт выше</label><output id="gunOut" for="gun"></output></div>
+            <input type="range" id="gun" min="0" max="30" step="1" value="0">
+            <p class="hint">На сколько осыпь выше точки прицеливания на 30 м.</p>
+          </div>
+          <div class="field"><label for="clay">Размер тарелки</label><select id="clay"></select></div>
+        </div>
+      </details>
+
+      <details class="sec">
+        <summary>2. Критерий попадания</summary>
+        <div class="body">
+          <div class="field">
+            <div class="row"><label for="minHits">Дробин на тарелке, не меньше</label><output id="minHitsOut" for="minHits"></output></div>
+            <input type="range" id="minHits" min="1" max="8" step="1" value="4">
+          </div>
+          <div class="field">
+            <div class="row"><label for="conf">С вероятностью не ниже</label><output id="confOut" for="conf"></output></div>
+            <input type="range" id="conf" min="50" max="99" step="1" value="80">
+          </div>
+        </div>
+      </details>
+
+      <details class="sec" open>
+        <summary>3. Позиции и траектория</summary>
+        <div class="body">
+          <div class="eyebrow grp first">Позиции</div>
+          <p class="hint">Тяните машинку, стрелка и конец оранжевой стрелки (курс). Квадрат 100 × 100 м, сетка через 10 м. Стороны света: С (0°) вверху, В (90°) справа, Ю (180°) внизу, З (270°) слева.</p>
+          <canvas id="pad" role="img" aria-label="Площадка: положение машинки и стрелка, курс вылета и след тарелки"></canvas>
+          <p class="hint" id="padInfo"></p>
+          <div class="xy">
+            <span class="lbl">Машинка, м</span>
+            <label>X <input type="number" id="mx" min="-50" max="50" step="1" value="0"></label>
+            <label>Y <input type="number" id="my" min="-50" max="50" step="1" value="0"></label>
+            <span class="lbl">Стрелок, м</span>
+            <label>X <input type="number" id="sx" min="-50" max="50" step="1" value="0"></label>
+            <label>Y <input type="number" id="sy" min="-50" max="50" step="1" value="-30"></label>
+          </div>
+          <div class="field">
+            <div class="row"><label for="hm">Высота машинки над землёй</label><output id="hmOut" for="hm"></output></div>
+            <input type="range" id="hm" min="0" max="25" step="0.5" value="1">
+          </div>
+          <div class="field">
+            <div class="row"><label for="zs">Возвышение стрелка над землёй</label><output id="zsOut" for="zs"></output></div>
+            <input type="range" id="zs" min="0" max="15" step="0.5" value="0">
+          </div>
+          <div class="eyebrow grp">Траектория тарелки</div>
+          <div class="field">
+            <div class="row"><span class="lbl" id="a0Lbl">Направление вылета</span><output id="a0Out" for="a0"></output></div>
+            <input type="range" id="a0" min="0" max="360" step="1" value="120" aria-labelledby="a0Lbl">
+            <div class="scale" aria-hidden="true"><span>С 0</span><span>В 90</span><span>Ю 180</span><span>З 270</span><span>С 360</span></div>
+            <p class="hint">Компас по сторонам света на площадке: 0° север, 90° восток, 180° юг, 270° запад. Показывает, куда тарелка летит по земле, а не вверх или вниз.</p>
+          </div>
+          <div class="field">
+            <div class="row"><label for="b0">Угол вылета над горизонтом</label><output id="b0Out" for="b0"></output></div>
+            <input type="range" id="b0" min="-30" max="90" step="1" value="15">
+            <p class="hint">0° горизонтально, 90° вертикально вверх, минус вниз.</p>
+          </div>
+          <div class="field">
+            <div class="row"><label for="vL">Начальная скорость тарелки</label><output id="vLOut" for="vL"></output></div>
+            <input type="range" id="vL" min="15" max="45" step="0.5" value="28">
+            <p class="hint">В момент вылета. Дальше воздух её тормозит.</p>
+          </div>
+          <details class="sec sub" id="secCurve">
+            <summary>Закругление и парение</summary>
+            <div class="body">
+              <div class="field">
+                <div class="row"><label for="omega">Поворот траектории</label><output id="omegaOut" for="omega"></output></div>
+                <input type="range" id="omega" min="-50" max="50" step="1" value="0">
+                <div class="scale" aria-hidden="true"><span>← влево</span><span>прямо</span><span>вправо →</span></div>
+                <p class="hint">Насколько быстро меняется направление полёта по земле, градусов в секунду. «Вправо» и «влево» считаются по ходу тарелки. Например, 30°/с это 45° за полторы секунды. После начала поворот идёт с той же скоростью до падения.</p>
+              </div>
+              <div class="field" id="onsetField">
+                <div class="row"><label for="onset">Начало поворота</label><output id="onsetOut" for="onset"></output></div>
+                <input type="range" id="onset" min="0" max="3" step="0.1" value="0.8">
+                <p class="hint">Через сколько секунд после вылета. До этого тарелка летит прямо, затем за полсекунды плавно выходит на заданный поворот. Если поворот равен нулю, не действует.</p>
+              </div>
+              <div class="field">
+                <div class="row"><label for="lift">Парение (подъёмная сила)</label><output id="liftOut" for="lift"></output></div>
+                <input type="range" id="lift" min="0" max="90" step="1" value="50">
+                <p class="hint">Какая часть веса тарелки уравновешена подъёмной силой от вращения в момент вылета. Подъёмная сила падает вместе со скоростью, поэтому тарелка сначала планирует, а к концу полёта падает круче. 0 % это свободное падение с торможением воздуха, 50 % это моя оценка для обычной тарелки. Подберите точнее на вкладке «Подгонка по замерам».</p>
+              </div>
+            </div>
+          </details>
+          <details class="sec sub" id="secCal">
+            <summary>Подгонка по замерам</summary>
+            <div class="body">
+              <p class="hint">Замерьте для тарелки время полёта (от вылета до падения) и дальность падения от машинки. Калькулятор подберёт скорость вылета и парение при заданных выше угле вылета и высоте машинки, поэтому сначала выставьте их.</p>
+              <div class="xy">
+                <span class="lbl">Время, с</span>
+                <input type="number" id="calT" min="0.5" max="10" step="0.1" value="" placeholder="например 2,5">
+                <span></span>
+                <span class="lbl">Дальность, м</span>
+                <input type="number" id="calR" min="5" max="150" step="1" value="" placeholder="например 55">
+                <span></span>
+              </div>
+              <button type="button" class="linkbtn" id="calBtn">Подобрать скорость и парение</button>
+              <p class="hint" id="calOut"></p>
+            </div>
+          </details>
+        </div>
+      </details>
+    </form>
+
+    <div class="visuals">
+      <section class="panel hero" aria-live="polite">
+        <div>
+          <div class="eyebrow">Сложность выстрела</div>
+          <div class="lvlname" id="lvlName">Базовая</div>
+          <div class="meter" id="meter" aria-hidden="true"></div>
+          <div class="lvlsub" id="lvlSub"></div>
+        </div>
+        <div>
+          <div class="eyebrow">Куда целиться</div>
+          <div class="aim" id="aimMain"></div>
+          <div class="aimsub" id="aimSub"></div>
+        </div>
+        <div class="best"><div class="t" id="bestText"></div><button type="button" class="linkbtn" id="bestBtn" hidden>Показать на ленте</button></div>
+      </section>
+
+      <section class="panel stage">
+        <div class="stagehead"><h2 class="eyebrow" style="margin:0">Полёт в 3D</h2><span class="sum" id="flightSum"></span></div>
+        <canvas id="scene" role="img" aria-label="Трёхмерная схема: машинка, стрелок, полная траектория тарелки, линия прицеливания и лучшее место для выстрела"></canvas>
+        <div class="chips camrow" role="group" aria-label="Ракурс">
+          <button type="button" class="chip" data-cam="iso">Обзор</button>
+          <button type="button" class="chip" data-cam="top">Сверху</button>
+          <button type="button" class="chip" data-cam="side">Сбоку</button>
+          <button type="button" class="chip" data-cam="line">Из-за стрелка</button>
+          <button type="button" class="chip" id="zxBtn">Высота ×2</button>
+          <span class="hint">Тяните, чтобы повернуть, колесо приближает.</span>
+        </div>
+        <div class="legend">
+          <span class="grad" id="legGrad"><span>легче</span></span>
+          <span><span class="dot" style="background:var(--ink)"></span>выстрел</span>
+          <span><span class="dot" style="border:2px solid var(--ink);"></span>точка встречи</span>
+          <span><span class="dot" style="background:var(--good);opacity:.55"></span>лучшее окно</span>
+          <span>точки на траектории: секунды, линии вниз: высота над землёй</span>
+        </div>
+      </section>
+
+      <section class="panel stage">
+        <div class="stagehead"><h2 class="eyebrow" style="margin:0">Сложность по ходу полёта</h2><span class="sum" id="ribbonHint"></span></div>
+        <canvas id="ribbon" role="img" aria-label="Лента сложности выстрела от вылета до падения тарелки"></canvas>
+        <div class="momentrow">
+          <input type="range" id="moment" min="2" max="96" step="0.5" value="45" aria-label="Момент выстрела">
+          <div class="t" id="momentText"></div>
+        </div>
+      </section>
+
+      <div class="lower">
+        <section class="panel stage">
+          <div class="stagehead"><h2 class="eyebrow" style="margin:0">Проверка выстрела</h2></div>
+          <canvas id="zoom" role="img" aria-label="Тарелка, осыпь и зоны надёжного разбития в масштабе"></canvas>
+          <div class="verdict" id="verdict" aria-live="polite"></div>
+          <div class="zoomtools">
+            <div class="field">
+              <div class="row"><label for="errLead">Ошибка упреждения (вперёд +)</label><output id="errLeadOut" for="errLead"></output></div>
+              <input type="range" id="errLead" min="-50" max="50" step="1" value="0">
+            </div>
+            <div class="field">
+              <div class="row"><label for="errH">Ошибка по высоте (выше +)</label><output id="errHOut" for="errH"></output></div>
+              <input type="range" id="errH" min="-40" max="40" step="1" value="0">
+            </div>
+            <button type="button" class="btn" id="fire">Выстрел</button>
+          </div>
+        </section>
+        <section class="panel calc">
+          <dl class="stats" id="quick"></dl>
+          <p class="note" id="note"></p>
+          <details><summary>Подробный расчёт</summary><dl class="stats" id="stats"></dl></details>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <details class="panel assume">
+    <summary>Допущения модели</summary>
+    <ul>
+      <li>Машинка стоит в начале координат на высоте от земли (не ниже земли, может быть вышка). Стрелок задаётся расстоянием и стороной от машинки и может стоять на возвышении. Земля вокруг траектории считается ровной, стрелок держит ствол на 1,5 м выше своей площадки. Куда стрелок смотрит, на расчёт не влияет.</li>
+      <li>Тарелка и дробь считаются в трёх измерениях. Тарелка летит под действием тяжести, торможения воздухом и «парения», а в режиме «Из машинки» ещё и закругляется: прямо до выбранного момента, затем плавный поворот с постоянной скоростью.</li>
+      <li>Сила тяжести сносит тарелку и дробь одинаково (около 4 см за время полёта дроби на 30 м), поэтому точка прицеливания лежит там, где тарелка была бы без тяжести. Расчёт сверен с численной симуляцией полёта дроби: расхождение до 2 см.</li>
+      <li>Торможение тарелки (около 0,6 % на метр скорости), парение (подъёмная сила направлена вверх и растёт со скоростью в квадрате) и закругление это ориентировочные значения. Подберите скорость и парение на вкладке «Подгонка по замерам», вписав время полёта и дальность падения с вашего стенда.</li>
+      <li>Дробь тормозит экспоненциально, коэффициент зависит от диаметра дробины. Число дробин в заряде оценочное.</li>
+      <li>Диаметр круга, в который попадает 50 % заряда, взят из вашей таблицы: радиус канала 9,25 мм плюс 10 мм на метр, умноженные на коэффициент чока. Плотность по кругу распределена по нормальному закону.</li>
+      <li>Сложность это отношение угла упреждения к допустимому углу ошибки (по вашей шкале). Допустимая ошибка это радиус зоны, где четыре и более дробин (по умолчанию) попадают в тарелку с заданной вероятностью. «Лучшее место» ищется среди точек полёта не ближе 0,2 с после вылета, выше 1 м над землёй и не дальше 80 м.</li>
+      <li>Посадка ружья влияет только на то, где держать точку прицеливания по высоте. Земля на виде сбоку нарисована на 1,5 м ниже ствола для ориентира.</li>
+    </ul>
+  </details>
+</div>
+
+<script>
+/* ---------- Расчётное ядро: полёт тарелки, дробь, осыпь, сложность ---------- */
+var G = 9.81;
+var GROUND = -1.5;          // земля ниже ствола, м (страница меняет по возвышению стрелка)
+var LAUNCH_H = -0.5;        // высота вылета по умолчанию относительно ствола, м
+var CLAY_K = 0.006;         // торможение тарелки, 1/м: dv/dt = -k |v| v
+var DT = 0.01;              // шаг интегрирования, с
+var MAX_T = 9;              // предельное время полёта, с
+var BORE_RADIUS_MM = 9.25;  // канал 18,5 мм (12 калибр), из таблицы пользователя
+var GROWTH_MM_PER_M = 10;   // рост радиуса осыпи, мм на метр при коэффициенте чока 1
+var SIGMA_PER_R50 = 1 / 1.17741;
+
+var CHOKES = [
+  { id: '0',    label: 'Цилиндр, 0 мм', coef: 1.00 },
+  { id: '0.25', label: '0,25 мм',        coef: 0.87 },
+  { id: '0.33', label: '0,33 мм',        coef: 0.82 },
+  { id: '0.5',  label: '0,5 мм',         coef: 0.71 },
+  { id: '0.6',  label: '0,6 мм',         coef: 0.64 },
+  { id: '0.75', label: '0,75 мм',        coef: 0.55 },
+  { id: '1',    label: '1 мм (фулл)',    coef: 0.45 }
+];
+// d — диаметр дробины, мм; pg — дробин в 1 г (оценка)
+var SHOTS = {
+  '9':   { label: '№9 (2,0 мм)',   d: 2.00, pg: 20.6 },
+  '8':   { label: '№8 (2,25 мм)',  d: 2.25, pg: 14.5 },
+  '7.5': { label: '№7,5 (2,4 мм)', d: 2.40, pg: 12.4 },
+  '7':   { label: '№7 (2,5 мм)',   d: 2.50, pg: 10.6 },
+  '6':   { label: '№6 (2,7 мм)',   d: 2.70, pg: 7.9 }
+};
+var CLAYS = [
+  { id: '0.11', label: 'Стандарт, 110 мм', d: 0.11 },
+  { id: '0.09', label: 'Миди, 90 мм',      d: 0.09 },
+  { id: '0.06', label: 'Мини, 60 мм',      d: 0.06 }
+];
+// Шкала сложности из таблицы пользователя: отношение угла упреждения к допустимому углу ошибки
+var LEVELS = ['Начальная', 'Базовая', 'Учебная', 'Стандартная', 'Средняя', 'Высокая', 'Предельная', 'Экстремальная', 'Невозможная'];
+var LEVEL_TH = [1.5, 3, 5, 7.5, 10, 13, 17];
+
+function levelOf(ratio) {
+  if (ratio === null || !isFinite(ratio)) return 8;
+  for (var i = 0; i < LEVEL_TH.length; i++) if (ratio < LEVEL_TH[i]) return i;
+  return 7;
+}
+function chokeCoef(id) {
+  for (var i = 0; i < CHOKES.length; i++) if (CHOKES[i].id === id) return CHOKES[i].coef;
+  return 1;
+}
+function dragK(dMm) { return 0.0235 / dMm; }                       // торможение дроби v(x) = v0 e^(-kx)
+function shotTime(x, v0, k) { return (Math.exp(k * x) - 1) / (k * v0); }
+function d50(x, coef) { return 2 * (BORE_RADIUS_MM + GROWTH_MM_PER_M * coef * x) / 1000; }
+function norm3(v) { return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]); }
+
+/* ---------- осыпь: вероятности ---------- */
+function i0e(x) {
+  x = Math.abs(x);
+  if (x < 3.75) {
+    var t = (x / 3.75) * (x / 3.75);
+    var p = 1 + t * (3.5156229 + t * (3.0899424 + t * (1.2067492 + t * (0.2659732 + t * (0.0360768 + t * 0.0045813)))));
+    return p * Math.exp(-x);
+  }
+  var u = 3.75 / x;
+  var q = 0.39894228 + u * (0.01328592 + u * (0.00225319 + u * (-0.00157565 + u * (0.00916281 +
+          u * (-0.02057706 + u * (0.02635537 + u * (-0.01647633 + u * 0.00392377)))))));
+  return q / Math.sqrt(x);
+}
+function discProb(r, a, sigma) {
+  var n = 64, h = a / n, s2 = sigma * sigma, sum = 0;
+  for (var i = 0; i <= n; i++) {
+    var rho = i * h;
+    var f = (rho / s2) * Math.exp(-((rho - r) * (rho - r)) / (2 * s2)) * i0e(rho * r / s2);
+    var w = (i === 0 || i === n) ? 1 : (i % 2 ? 4 : 2);
+    sum += w * f;
+  }
+  return Math.min(1, sum * h / 3);
+}
+function poissonGE(mu, k) {
+  if (k <= 0) return 1;
+  var term = Math.exp(-mu), cum = 0;
+  for (var i = 0; i < k; i++) { cum += term; term *= mu / (i + 1); }
+  return Math.max(0, Math.min(1, 1 - cum));
+}
+function findR(fn, target, hi) {
+  if (fn(0) < target) return null;
+  var lo = 0, guard = 0;
+  while (fn(hi) >= target && guard++ < 20) hi *= 2;
+  for (var i = 0; i < 40; i++) {
+    var mid = (lo + hi) / 2;
+    if (fn(mid) >= target) lo = mid; else hi = mid;
+  }
+  return lo;
+}
+
+/* ---------- полёт тарелки ---------- */
+// Оси: x — вправо, y — вперёд (на машинку в режиме вылета), z — вверх от ствола.
+function mkPhys(c) {
+  var w0 = (c.omega || 0) * Math.PI / 180;
+  var onset = (c.onset === undefined) ? null : c.onset;
+  return {
+    k: (c.k === undefined || c.k === null) ? CLAY_K : c.k,
+    L: (c.lift || 0) / 100,                                  // подъёмная сила на скорости вылета, доля веса
+    vref: Math.max(1, c.V || 28),                            // скорость вылета: на ней подъёмная сила равна L·вес
+    w: !w0 ? function () { return 0; }
+       : (onset === null ? function () { return w0; }
+          : function (tau) { var x = (tau - onset) / 0.5; x = x <= 0 ? 0 : (x >= 1 ? 1 : x * x * (3 - 2 * x)); return w0 * x; })
+  };
+}
+function accel(s, w, k, L, vref) {
+  var sp = Math.sqrt(s[3] * s[3] + s[4] * s[4] + s[5] * s[5]);
+  var q = sp / vref, ge = G * (1 - L * Math.min(1.5, q * q));   // подъёмная сила растёт со скоростью в квадрате
+  return [s[3], s[4], s[5], w * s[4] - k * sp * s[3], -w * s[3] - k * sp * s[4], -ge - k * sp * s[5]];
+}
+function addScaled(s, d, h) { var o = new Array(6); for (var i = 0; i < 6; i++) o[i] = s[i] + d[i] * h; return o; }
+function stepRK4(s, tau, dt, p) {
+  var k1 = accel(s, p.w(tau), p.k, p.L, p.vref);
+  var k2 = accel(addScaled(s, k1, dt / 2), p.w(tau + dt / 2), p.k, p.L, p.vref);
+  var k3 = accel(addScaled(s, k2, dt / 2), p.w(tau + dt / 2), p.k, p.L, p.vref);
+  var k4 = accel(addScaled(s, k3, dt), p.w(tau + dt), p.k, p.L, p.vref);
+  var o = new Array(6);
+  for (var i = 0; i < 6; i++) o[i] = s[i] + dt / 6 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i]);
+  return o;
+}
+function velVec(alphaDeg, climbDeg, V) {
+  var al = alphaDeg * Math.PI / 180, el = climbDeg * Math.PI / 180, vh = V * Math.cos(el);
+  return [vh * Math.sin(al), vh * Math.cos(al), V * Math.sin(el)];
+}
+function makeFlight(states, tauShot) {
+  var n = states.length, T = (n - 1) * DT, j;
+  for (j = 1; j < n; j++) {
+    if (states[j][2] <= GROUND && states[j - 1][2] > GROUND) {
+      var fr = (states[j - 1][2] - GROUND) / (states[j - 1][2] - states[j][2]);
+      T = (j - 1 + fr) * DT; n = j + 1; break;
+    }
+  }
+  var f = { n: n, dt: DT, T: T, tauShot: tauShot, x: [], y: [], z: [], vx: [], vy: [], vz: [] };
+  for (j = 0; j < n; j++) {
+    f.x.push(states[j][0]); f.y.push(states[j][1]); f.z.push(states[j][2]);
+    f.vx.push(states[j][3]); f.vy.push(states[j][4]); f.vz.push(states[j][5]);
+  }
+  return f;
+}
+
+/* Вылет из машинки: c = { D (горизонтальная дистанция до машинки), bearing (направление на машинку, °), alpha (курс полёта, ° со знаком, 0 вперёд от стрелка, 90 вправо, 180 назад),
+   climb (угол вылета), V, h0, omega (°/с), onset (с), lift (%), k } */
+function simulateLaunch(c) {
+  var p = mkPhys(c);
+  var v = velVec(c.alpha, c.climb, c.V);
+  var br = (c.bearing || 0) * Math.PI / 180;      // где стоит машинка: 0 впереди, + справа, 180 сзади
+  var x0 = c.x0 !== undefined ? c.x0 : c.D * Math.sin(br), y0 = c.y0 !== undefined ? c.y0 : c.D * Math.cos(br);
+  var s = [x0, y0, (c.h0 === undefined ? LAUNCH_H : c.h0), v[0], v[1], v[2]];
+  var states = [s], tau = 0;
+  while ((s[2] > GROUND || s[5] > 0) && tau < MAX_T) { s = stepRK4(s, tau, DT, p); tau += DT; states.push(s); }
+  return makeFlight(states, null);
+}
+
+/* Полёт, достроенный от состояния в момент выстрела:
+   c = { R (по прямой), h, alpha (° со знаком), climb, V, omega, lift, k }. Закругление постоянное. */
+function simulateFromState(c) {
+  var cc = { omega: c.omega, onset: null, lift: c.lift, k: c.k, V: c.V };
+  var p = mkPhys(cc);
+  var Rh = Math.sqrt(Math.max(c.R * c.R - c.h * c.h, 1));
+  var v = velVec(c.alpha, c.climb, c.V);
+  var s0 = [0, Rh, c.h, v[0], v[1], v[2]];
+  var back = [], s = s0, i;
+  for (i = 0; i < 600 && s[2] > GROUND + 1.0; i++) {
+    s = stepRK4(s, 0, -DT, p);
+    back.push(s);
+    if (Math.hypot(s[0], s[1]) > 200) break;
+  }
+  var fwd = [s0]; s = s0; var tau = 0;
+  while (s[2] > GROUND && tau < MAX_T) { s = stepRK4(s, 0, DT, p); tau += DT; fwd.push(s); }
+  var states = back.reverse().concat(fwd);
+  return makeFlight(states, back.length * DT);
+}
+
+
+/* Подгонка скорости вылета и парения под замеры: Tm — время полёта (с), Rm — дальность падения от машинки по земле (м).
+   base — параметры simulateLaunch (угол вылета, высота, положение и т.д.). Возвращает { V, lift, T, R, err }. */
+function calibrate(base, Tm, Rm) {
+  function sim(V, lift) {
+    var f = simulateLaunch({ x0: base.x0, y0: base.y0, alpha: base.alpha, climb: base.climb, V: V, h0: base.h0, omega: base.omega, onset: base.onset, lift: lift });
+    var e = f.n - 1;
+    return { T: f.T, R: Math.hypot(f.x[e] - f.x[0], f.y[e] - f.y[0]) };
+  }
+  function cost(V, lift) { var r = sim(V, lift); return Math.pow((r.T - Tm) / Tm, 2) + Math.pow((r.R - Rm) / Rm, 2); }
+  var v0 = 15, v1 = 45, l0 = 0, l1 = 90, best = { V: 28, lift: 50, c: Infinity }, lev, i, j, n = 8;
+  for (lev = 0; lev < 5; lev++) {
+    for (i = 0; i <= n; i++) for (j = 0; j <= n; j++) {
+      var V = v0 + (v1 - v0) * i / n, L = l0 + (l1 - l0) * j / n, cc = cost(V, L);
+      if (cc < best.c) best = { V: V, lift: L, c: cc };
+    }
+    var dv = (v1 - v0) / n, dl = (l1 - l0) / n;
+    v0 = Math.max(15, best.V - dv); v1 = Math.min(45, best.V + dv); l0 = Math.max(0, best.lift - dl); l1 = Math.min(90, best.lift + dl);
+  }
+  var r = sim(best.V, best.lift);
+  return { V: best.V, lift: best.lift, T: r.T, R: r.R, err: Math.sqrt(best.c) };
+}
+
+function posAt(f, tau) {
+  var tmax = (f.n - 1) * f.dt;
+  tau = Math.max(0, Math.min(tmax, tau));
+  var i = Math.min(f.n - 2, Math.floor(tau / f.dt));
+  var u = (tau - i * f.dt) / f.dt, h = f.dt;
+  var h00 = 2 * u * u * u - 3 * u * u + 1, h10 = u * u * u - 2 * u * u + u, h01 = -2 * u * u * u + 3 * u * u, h11 = u * u * u - u * u;
+  return [
+    h00 * f.x[i] + h10 * h * f.vx[i] + h01 * f.x[i + 1] + h11 * h * f.vx[i + 1],
+    h00 * f.y[i] + h10 * h * f.vy[i] + h01 * f.y[i + 1] + h11 * h * f.vy[i + 1],
+    h00 * f.z[i] + h10 * h * f.vz[i] + h01 * f.z[i + 1] + h11 * h * f.vz[i + 1]
+  ];
+}
+function velAt(f, tau) {
+  var tmax = (f.n - 1) * f.dt;
+  tau = Math.max(0, Math.min(tmax, tau));
+  var i = Math.min(f.n - 2, Math.floor(tau / f.dt)), u = (tau - i * f.dt) / f.dt;
+  return [f.vx[i] * (1 - u) + f.vx[i + 1] * u, f.vy[i] * (1 - u) + f.vy[i + 1] * u, f.vz[i] * (1 - u) + f.vz[i + 1] * u];
+}
+function flightInfo(f) {
+  var apex = -Infinity, i;
+  for (i = 0; i < f.n; i++) if (f.z[i] > apex) apex = f.z[i];
+  var e = posAt(f, f.T), v0 = norm3([f.vx[0], f.vy[0], f.vz[0]]);
+  return { T: f.T, apexAbove: apex - GROUND, landDist: Math.hypot(e[0], e[1]), v0: v0,
+           launch: [f.x[0], f.y[0], f.z[0]], land: e };
+}
+
+/* ---------- точка встречи ---------- */
+// Тяжесть сносит и тарелку, и дробь: точка прицеливания лежит выше места встречи на g t²/2.
+function intercept(f, tauS, v0s, k) {
+  var P0 = posAt(f, tauS), t = shotTime(norm3(P0), v0s, k), A = P0, d = norm3(P0);
+  for (var i = 0; i < 40; i++) {
+    var Q = posAt(f, Math.min(tauS + t, f.T));
+    A = [Q[0], Q[1], Q[2] + 0.5 * G * t * t];
+    d = norm3(A);
+    var tn = shotTime(d, v0s, k);
+    if (Math.abs(tn - t) < 1e-9) { t = tn; break; }
+    t = tn;
+  }
+  var Q2 = posAt(f, Math.min(tauS + t, f.T));
+  A = [Q2[0], Q2[1], Q2[2] + 0.5 * G * t * t];
+  d = norm3(A);
+  return { P0: P0, A: A, d: d, t: t, late: tauS + t > f.T + 1e-9 };
+}
+
+/* ---------- таблица надёжной зоны по дистанции ---------- */
+function buildTable(ch) {
+  var shot = SHOTS[ch.shot], coef = chokeCoef(ch.choke), N = Math.round(shot.pg * ch.mass), a = ch.clay / 2;
+  var arr = [];
+  for (var d = 2; d <= 120; d++) {
+    var D50 = d50(d, coef), sg = D50 / 2 * SIGMA_PER_R50;
+    arr.push(findR(function (r) { return poissonGE(N * discProb(r, a, sg), ch.minHits); }, ch.conf, D50 + a));
+  }
+  return {
+    at: function (d) {
+      var x = Math.max(2, Math.min(120, d)) - 2, i = Math.min(arr.length - 2, Math.floor(x)), u = x - i;
+      if (arr[i] === null || arr[i + 1] === null) return null;
+      return arr[i] * (1 - u) + arr[i + 1] * u;
+    }
+  };
+}
+
+/* ---------- полный анализ выстрела в момент tauS ---------- */
+function analyze(f, tauS, ch) {
+  var shot = SHOTS[ch.shot], k = dragK(shot.d), coef = chokeCoef(ch.choke);
+  var ic = intercept(f, tauS, ch.v0, k);
+  var P0 = ic.P0, A = ic.A, d = ic.d, t = ic.t;
+  var V3 = velAt(f, tauS), speed = norm3(V3), vh = Math.hypot(V3[0], V3[1]);
+  var delta = [A[0] - P0[0], A[1] - P0[1], A[2] - P0[2]];
+  var leadPath = norm3(delta), leadHoriz = Math.hypot(delta[0], delta[1]), vertLead = delta[2];
+  var R = norm3(P0), Rh = Math.hypot(P0[0], P0[1]), h = P0[2];
+
+  // состояние в момент выстрела в привычных величинах
+  var Lx = P0[0] / Rh, Ly = P0[1] / Rh;
+  var along = V3[0] * Lx + V3[1] * Ly, across = V3[0] * Ly - V3[1] * Lx;
+  var alpha = Math.atan2(Math.abs(across), along) * 180 / Math.PI * (across < -1e-9 ? -1 : 1);
+  var climb = Math.atan2(V3[2], vh) * 180 / Math.PI;
+
+  var cosA = (P0[0] * A[0] + P0[1] * A[1] + P0[2] * A[2]) / (R * d);
+  var leadAng = Math.acos(Math.max(-1, Math.min(1, cosA)));
+  var az0 = Math.atan2(P0[0], P0[1]), azA = Math.atan2(A[0], A[1]);
+  var leadAz = Math.abs(Math.atan2(Math.sin(azA - az0), Math.cos(azA - az0)));
+  var elev0 = Math.atan2(P0[2], Rh), elevA = Math.atan2(A[2], Math.hypot(A[0], A[1]));
+
+  // плоскость мишени, перпендикулярная линии выстрела
+  var ax = A[0] / d, ay = A[1] / d, az = A[2] / d, hyp = Math.hypot(ax, ay);
+  var r1 = hyp > 1e-6 ? ay / hyp : 1, r2 = hyp > 1e-6 ? -ax / hyp : 0;
+  var u1 = r2 * az, u2 = -r1 * az, u3 = r1 * ay - r2 * ax;
+  var dir = leadPath > 1e-6 ? delta : V3, dn = norm3(dir);
+  var lateralV = (dir[0] * r1 + dir[1] * r2) / dn;
+  var upV = (dir[0] * u1 + dir[1] * u2 + dir[2] * u3) / dn;
+  var sinG = Math.min(1, Math.hypot(lateralV, upV));
+
+  var D50 = d50(d, coef), sigma = D50 / 2 * SIGMA_PER_R50;
+  var N = Math.round(shot.pg * ch.mass), a = ch.clay / 2;
+  function mu(r) { return N * discProb(r, a, sigma); }
+  function pOK(r) { return poissonGE(mu(r), ch.minHits); }
+  var hi0 = D50 + a;
+  var rGreen = findR(pOK, ch.conf, hi0), rYellow = findR(pOK, 0.5, hi0), rChip = findR(mu, 1, hi0);
+  var tolAng = rGreen === null ? 0 : Math.atan(rGreen / d);
+  var ratio = (rGreen === null || rGreen <= 0) ? Infinity : leadAng / tolAng;
+  var gunOff = (ch.gun || 0) / 100 * d / 30;
+
+  return {
+    tauS: tauS, P0: P0, A: A, V3: V3, speed: speed, t: t, d: d, late: ic.late,
+    R: R, Rh: Rh, h: h, alpha: alpha, climb: climb,
+    leadPath: leadPath, leadHoriz: leadHoriz, vertLead: vertLead,
+    leadAng: leadAng, leadAz: leadAz, elev0: elev0, elevA: elevA,
+    lateralV: lateralV, upV: upV, sinG: sinG,
+    dropG: 0.5 * G * t * t, gunOff: gunOff, hold: vertLead - gunOff,
+    D50: D50, sigma: sigma, N: N, a: a,
+    muCenter: mu(0), pCenter: pOK(0),
+    rGreen: rGreen, rYellow: rYellow, rChip: rChip,
+    tolPath: (rGreen !== null && sinG > 0.05) ? rGreen / sinG : null,
+    tolAng: tolAng, ratio: ratio, level: rGreen === null ? 8 : levelOf(ratio),
+    mu: mu, pOK: pOK
+  };
+}
+
+/* ---------- профиль сложности вдоль полёта и лучшее место ---------- */
+function profile(f, ch, tbl, M) {
+  M = M || 90;
+  var k = dragK(SHOTS[ch.shot].d), out = { n: M + 1, tau: [], ratio: [], level: [], ok: [], d: [], z: [] };
+  for (var i = 0; i <= M; i++) {
+    var tau = f.T * i / M, ic = intercept(f, tau, ch.v0, k);
+    var R = norm3(ic.P0), cosA = (ic.P0[0] * ic.A[0] + ic.P0[1] * ic.A[1] + ic.P0[2] * ic.A[2]) / (R * ic.d);
+    var leadAng = Math.acos(Math.max(-1, Math.min(1, cosA)));
+    var rg = tbl.at(ic.d), ratio = (rg === null || rg <= 0) ? Infinity : leadAng / Math.atan(rg / ic.d);
+    out.tau.push(tau); out.ratio.push(ratio); out.d.push(ic.d); out.z.push(ic.P0[2]);
+    out.level.push(rg === null ? 8 : levelOf(ratio));
+    out.ok.push(!ic.late && ic.P0[2] >= GROUND + 1.0 && ic.d <= 80 && rg !== null && tau >= 0.2);
+  }
+  var best = -1, bv = Infinity, j;
+  for (j = 0; j <= M; j++) if (out.ok[j] && out.ratio[j] < bv) { bv = out.ratio[j]; best = j; }
+  if (best >= 0) {
+    var ties = [];
+    for (j = 0; j <= M; j++) if (out.ok[j] && out.ratio[j] <= bv + 1e-3) ties.push(j);
+    best = ties[Math.floor(ties.length / 2)];
+    var thr = Math.max(bv * 1.25, bv + 0.3), lo = best, hi = best;
+    while (lo > 0 && out.ok[lo - 1] && out.ratio[lo - 1] <= thr) lo--;
+    while (hi < M && out.ok[hi + 1] && out.ratio[hi + 1] <= thr) hi++;
+    out.winLo = lo; out.winHi = hi;
+  }
+  out.best = best;
+  return out;
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = { calibrate: calibrate, simulateLaunch: simulateLaunch, simulateFromState: simulateFromState, posAt: posAt, velAt: velAt,
+    flightInfo: flightInfo, intercept: intercept, analyze: analyze, profile: profile, buildTable: buildTable,
+    SHOTS: SHOTS, CHOKES: CHOKES, LEVELS: LEVELS, G: G, GROUND: GROUND, discProb: discProb, shotTime: shotTime, dragK: dragK };
+}
+
+</script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+
+  var PRESETS = [
+    { id: 'cross', name: 'Поперечная', p: { hm: 1, mx: 0, my: 0, sx: 0, sy: -30, zs: 0, a0: 120, b0: 15, vL: 28, omega: 0, onset: 0.8, lift: 50 } },
+    { id: 'away', name: 'Угонная', p: { hm: 1, mx: 0, my: 0, sx: 0, sy: -8, zs: 0, a0: 0, b0: 20, vL: 30, omega: 0, onset: 0.8, lift: 50 } },
+    { id: 'in', name: 'Налётная', p: { hm: 7.5, mx: 0, my: 0, sx: 0, sy: -50, zs: 0, a0: 180, b0: 6, vL: 25, omega: 0, onset: 0.8, lift: 50 } },
+    { id: 'right', name: 'Машинка справа', p: { hm: 1, mx: 0, my: 0, sx: -26, sy: -15, zs: 0, a0: 260, b0: 15, vL: 26, omega: 0, onset: 0.8, lift: 50 } },
+    { id: 'left', name: 'Машинка слева', p: { hm: 1, mx: 0, my: 0, sx: 26, sy: -15, zs: 0, a0: 100, b0: 15, vL: 26, omega: 0, onset: 0.8, lift: 50 } },
+    { id: 'behind', name: 'Машинка сзади, через голову', p: { hm: 1, mx: 0, my: 0, sx: 0, sy: 20, zs: 0, a0: 0, b0: 28, vL: 28, omega: 0, onset: 0.8, lift: 50 } },
+    { id: 'tower', name: 'Вышка сверху', p: { hm: 13.5, mx: 0, my: 0, sx: 0, sy: -20, zs: 0, a0: 180, b0: -5, vL: 20, omega: 0, onset: 0.8, lift: 50 } },
+    { id: 'hill', name: 'Стрелок на возвышении', p: { hm: 1, mx: 0, my: 0, sx: 0, sy: -25, zs: 5, a0: 120, b0: 15, vL: 28, omega: 0, onset: 0.8, lift: 50 } },
+    { id: 'high', name: 'Высокая «свеча»', p: { hm: 1, mx: 0, my: 0, sx: 0, sy: -10, zs: 0, a0: 170, b0: 62, vL: 24, omega: 0, onset: 0.8, lift: 50 } }
+  ];
+
+  var S = { hm: 1, mx: 0, my: 0, sx: 0, sy: -30, zs: 0, a0: 120, b0: 15, vL: 28, omega: 0, onset: 0.8, lift: 50,
+            moment: 45,
+            clay: '0.11', choke: '0.5', shot: '7.5', mass: 28, v0: 400, gun: 0, minHits: 4, conf: 80, errLead: 0, errH: 0 };
+  var F = null, PR = null, M = null, INFO = null, TBL = null, tblKey = '', shotRes = null, anim = null, preset = 'cross';
+
+  function fmt(x, dec) { return Number(x).toLocaleString('ru-RU', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
+  function cm(x) { return fmt(x * 100, 0) + ' см'; }
+  function vertText(v) { return Math.abs(v) < 0.005 ? '0 см' : (v > 0 ? '↑ ' : '↓ ') + fmt(Math.abs(v) * 100, 0) + ' см'; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function alphaText(v) { return v === 0 ? '0°' : (v > 0 ? fmt(v, 0) + '° →' : '← ' + fmt(-v, 0) + '°'); }
+  function plural(n) { var a = n % 10, b = n % 100; return (a === 1 && b !== 11) ? 'дробина' : ((a >= 2 && a <= 4 && (b < 10 || b >= 20)) ? 'дробины' : 'дробин'); }
+
+  /* ---------- поля ввода ---------- */
+  var REG = {};
+  function reg(id, key, text) {
+    REG[id] = { key: key, text: text };
+    $(id).addEventListener('input', function () {
+      S[key] = parseFloat($(id).value); $(id + 'Out').textContent = text(S[key]);
+      shotRes = null; anim = null; update();
+    });
+    $(id + 'Out').textContent = text(S[key]);
+  }
+  function setVal(id, v) {
+    var r = REG[id]; S[r.key] = v; $(id).value = String(v); if (r.text) $(id + 'Out').textContent = r.text(v);
+  }
+  // числовые поля площадки
+  ['mx', 'my', 'sx', 'sy'].forEach(function (id) {
+    REG[id] = { key: id, text: null };
+    $(id).value = String(S[id]);
+    $(id).addEventListener('input', function () {
+      var v = parseFloat($(id).value); if (isNaN(v)) return;
+      S[id] = clamp(v, -PAD, PAD); preset = null; shotRes = null; anim = null; update();
+    });
+  });
+  reg('hm', 'hm', function (v) { return fmt(v, 1) + ' м'; });
+  reg('zs', 'zs', function (v) { return v === 0 ? 'на земле' : '+' + fmt(v, 1) + ' м'; });
+  function dirWord(v) {
+    var names = ['север', 'северо-восток', 'восток', 'юго-восток', 'юг', 'юго-запад', 'запад', 'северо-запад'];
+    return names[Math.round(((v % 360) + 360) % 360 / 45) % 8];
+  }
+  reg('a0', 'a0', function (v) { return fmt(v, 0) + '° · ' + dirWord(v); });
+  reg('b0', 'b0', function (v) { return (v < 0 ? '−' + fmt(-v, 0) : fmt(v, 0)) + '°'; });
+  reg('vL', 'vL', function (v) { return fmt(v, 0) + ' м/с (' + fmt(v * 3.6, 0) + ' км/ч)'; });
+  reg('omega', 'omega', function (v) { return v === 0 ? 'прямо' : fmt(Math.abs(v), 0) + '°/с ' + (v > 0 ? 'вправо' : 'влево'); });
+  reg('onset', 'onset', function (v) { return fmt(v, 1) + ' с'; });
+  reg('lift', 'lift', function (v) { return fmt(v, 0) + ' %'; });
+  reg('v0', 'v0', function (v) { return fmt(v, 0) + ' м/с'; });
+  reg('gun', 'gun', function (v) { return fmt(v, 0) + ' см'; });
+  reg('minHits', 'minHits', function (v) { return fmt(v, 0) + ' шт.'; });
+  reg('conf', 'conf', function (v) { return fmt(v, 0) + ' %'; });
+  reg('errLead', 'errLead', function (v) { return (v > 0 ? '+' : '') + fmt(v, 0) + ' см'; });
+  reg('errH', 'errH', function (v) { return (v > 0 ? '+' : '') + fmt(v, 0) + ' см'; });
+  // момент выстрела: свой вывод в строке под лентой
+  $('moment').addEventListener('input', function () { S.moment = parseFloat($('moment').value); shotRes = null; anim = null; update(); });
+
+  function fillSelect(id, items, val) {
+    var el = $(id); el.innerHTML = '';
+    items.forEach(function (it) { var o = document.createElement('option'); o.value = it.v; o.textContent = it.t; el.appendChild(o); });
+    el.value = val;
+  }
+  fillSelect('clay', CLAYS.map(function (c) { return { v: c.id, t: c.label }; }), S.clay);
+  fillSelect('choke', CHOKES.map(function (c) { return { v: c.id, t: c.label }; }), S.choke);
+  fillSelect('shot', Object.keys(SHOTS).map(function (k) { return { v: k, t: SHOTS[k].label }; }), S.shot);
+  $('mass').value = String(S.mass);
+  [['clay', 'clay'], ['choke', 'choke'], ['shot', 'shot']].forEach(function (p) {
+    $(p[0]).addEventListener('change', function () { S[p[1]] = $(p[0]).value; shotRes = null; anim = null; update(); });
+  });
+  $('mass').addEventListener('change', function () { S.mass = parseFloat($('mass').value); shotRes = null; anim = null; update(); });
+
+  /* ---------- типовые полёты и углы ---------- */
+  var presetBtns = [];
+  PRESETS.forEach(function (pr) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.textContent = pr.name; b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', function () {
+      Object.keys(pr.p).forEach(function (k) { setVal(k, pr.p[k]); });
+      preset = pr.id; shotRes = null; anim = null; CAM.refit = true; resetView(); goBest();
+    });
+    $('presets').appendChild(b); presetBtns.push([pr.id, b]);
+  });
+  ['hm', 'zs', 'a0', 'b0', 'vL', 'omega', 'onset', 'lift'].forEach(function (id) {
+    $(id).addEventListener('input', function () { preset = null; });
+  });
+
+  function resetView() { shotRes = null; anim = null; CAM.refit = true; update(); }
+
+  /* ---------- подгонка по замерам ---------- */
+  $('calBtn').addEventListener('click', function () {
+    var Tm = parseFloat($('calT').value), Rm = parseFloat($('calR').value), out = $('calOut');
+    if (!(Tm >= 0.5 && Tm <= 10) || !(Rm >= 5 && Rm <= 150)) { out.textContent = 'Введите время от 0,5 до 10 с и дальность от 5 до 150 м.'; return; }
+    GROUND = -(S.zs + 1.5);
+    var r = calibrate({ x0: S.mx - S.sx, y0: S.my - S.sy, alpha: S.a0, climb: S.b0, h0: S.hm - (S.zs + 1.5), omega: S.omega, onset: S.onset }, Tm, Rm);
+    var V = Math.round(r.V * 2) / 2, L = Math.round(r.lift);
+    setVal('vL', V); setVal('lift', L); preset = null; shotRes = null; anim = null; update();
+    out.textContent = 'Подобрано: скорость ' + fmt(V, 1) + ' м/с (' + fmt(V * 3.6, 0) + ' км/ч), парение ' + fmt(L, 0) + ' %. Модель даёт ' + fmt(r.T, 1) + ' с и ' + fmt(r.R, 0) + ' м.'
+      + (r.err > 0.08 ? ' Замеры воспроизвелись неточно: проверьте угол вылета, высоту машинки и сами замеры.' : '');
+  });
+
+  /* ---------- расчёт ---------- */
+  function charge() {
+    return { choke: S.choke, shot: S.shot, mass: S.mass, v0: S.v0, clay: parseFloat(S.clay), minHits: S.minHits, conf: S.conf / 100, gun: S.gun };
+  }
+  function update() {
+    GROUND = -(S.zs + 1.5);
+    F = simulateLaunch({ x0: S.mx - S.sx, y0: S.my - S.sy, alpha: S.a0, climb: S.b0, V: S.vL, h0: S.hm - (S.zs + 1.5), omega: S.omega, onset: S.onset, lift: S.lift });
+    var tauS = F.T * S.moment / 100;
+    var ch = charge(), key = [S.choke, S.shot, S.mass, S.clay, S.minHits, S.conf].join('|');
+    if (key !== tblKey) { TBL = buildTable(ch); tblKey = key; }
+    PR = profile(F, ch, TBL, 90);
+    M = analyze(F, tauS, ch);
+    INFO = flightInfo(F);
+    fillTexts();
+    drawAll();
+  }
+
+  /* ---------- цвета и холсты ---------- */
+  function pal() {
+    var cs = getComputedStyle(document.documentElement);
+    function g(n) { return cs.getPropertyValue(n).trim(); }
+    var lv = []; for (var i = 0; i < 9; i++) lv.push(g('--lv' + i));
+    return { panel: g('--panel'), ink: g('--ink'), ink2: g('--ink2'), line: g('--line'), accent: g('--accent'),
+             clay: g('--clay'), good: g('--good'), warn: g('--warn'), bad: g('--bad'), lv: lv,
+             mono: g('--f-mono'), head: g('--f-head'), body: g('--f-body') };
+  }
+  function setup(cv) {
+    var dpr = window.devicePixelRatio || 1, w = Math.max(1, cv.clientWidth), h = Math.max(1, cv.clientHeight);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    var ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    return { ctx: ctx, w: w, h: h };
+  }
+  // подпись с обводкой цветом фона, чтобы читалась поверх линий
+  function lab(ctx, C, s, x, y, font, color, align, base) {
+    ctx.font = font; ctx.textAlign = align || 'left'; ctx.textBaseline = base || 'alphabetic';
+    ctx.lineJoin = 'round'; ctx.lineWidth = 4.5; ctx.strokeStyle = C.panel; ctx.strokeText(s, x, y);
+    ctx.fillStyle = color; ctx.fillText(s, x, y);
+  }
+  function arrowHead(ctx, x, y, ang, size) {
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.lineTo(x - size * Math.cos(ang - 0.45), y - size * Math.sin(ang - 0.45));
+    ctx.lineTo(x - size * Math.cos(ang + 0.45), y - size * Math.sin(ang + 0.45));
+    ctx.closePath(); ctx.fill();
+  }
+  function pIdx(i) { return Math.min(PR.n - 1, Math.round(i * DT / F.T * (PR.n - 1))); }
+  function tIdx(tau) { return Math.min(PR.n - 1, Math.max(0, Math.round(tau / F.T * (PR.n - 1)))); }
+
+  // линия траектории: цвет сегмента зависит от сложности в этот момент
+  function strokeFlight(ctx, C, px, py, lw) {
+    var n = F.n, i;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.globalAlpha = .4; ctx.strokeStyle = C.ink; ctx.lineWidth = lw + 3;
+    ctx.beginPath(); ctx.moveTo(px[0], py[0]); for (i = 1; i < n; i++) ctx.lineTo(px[i], py[i]); ctx.stroke();
+    ctx.lineWidth = lw;
+    for (i = 1; i < n; i++) {
+      var k = pIdx(i);
+      ctx.globalAlpha = PR.ok[k] ? 1 : .5; ctx.strokeStyle = C.lv[PR.level[k]];
+      ctx.beginPath(); ctx.moveTo(px[i - 1], py[i - 1]); ctx.lineTo(px[i], py[i]); ctx.stroke();
+    }
+    ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+  }
+  function strokeWindow(ctx, C, px, py, lw) {
+    if (PR.best < 0) return;
+    var i0 = Math.round(PR.tau[PR.winLo] / DT), i1 = Math.min(F.n - 1, Math.round(PR.tau[PR.winHi] / DT)), i;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha = .32; ctx.strokeStyle = C.good; ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.moveTo(px[i0], py[i0]); for (i = i0 + 1; i <= i1; i++) ctx.lineTo(px[i], py[i]); ctx.stroke();
+    ctx.globalAlpha = 1; ctx.lineCap = 'butt';
+  }
+  function tauAnim(u) { return M.tauS + u * M.t; }
+
+  /* ---------- 3D-вид ---------- */
+  var CAM = { yaw: -28, pitch: 38, zoom: 1, zx: 2, fit: null, refit: true, dragging: false, w: 0 };
+  function drawScene(u) {
+    var o = setup($('scene')), ctx = o.ctx, w = o.w, h = o.h, C = pal();
+    var n = F.n, i, Z0 = -GROUND;          // Z — высота над землёй
+    var minX = 0, maxX = 0, minY = 0, maxY = 0, maxZ = Z0, maxR = 0;
+    for (i = 0; i < n; i += 3) {
+      minX = Math.min(minX, F.x[i]); maxX = Math.max(maxX, F.x[i]); minY = Math.min(minY, F.y[i]); maxY = Math.max(maxY, F.y[i]);
+      maxZ = Math.max(maxZ, F.z[i] - GROUND); maxR = Math.max(maxR, Math.hypot(F.x[i], F.y[i]));
+    }
+    minX = Math.min(minX, M.A[0]); maxX = Math.max(maxX, M.A[0]); minY = Math.min(minY, M.A[1]); maxY = Math.max(maxY, M.A[1]);
+    maxZ = Math.max(maxZ, M.A[2] - GROUND);
+    var mg = 12; minX -= mg; maxX += mg; minY -= mg; maxY += mg;
+    var th = CAM.yaw * Math.PI / 180, ph = CAM.pitch * Math.PI / 180, cth = Math.cos(th), sth = Math.sin(th), cph = Math.cos(ph), sph = Math.sin(ph);
+    var fr = CAM.fit, padX = 34, padT = 30, padB = 30;
+    if (fr && CAM.w !== w) CAM.refit = true;
+    CAM.w = w;
+    var doFit = !fr || CAM.refit, head = 1, keep = false;
+    function proj(x, y, z) {
+      var dx = x - fr.cx, dy = y - fr.cy, dz = (z - fr.cz) * CAM.zx;
+      var xr = dx * cth + dy * sth, yr = -dx * sth + dy * cth;
+      var up = dz * cph + yr * sph, dep = yr * cph - dz * sph, f = fr.Dc / (fr.Dc + dep);
+      return [xr * f, up * f, f];
+    }
+    function P(x, y, z) { var a = proj(x, y, z); return [w / 2 + a[0] * fr.sc * CAM.zoom, (padT + h - padB) / 2 - a[1] * fr.sc * CAM.zoom, a[2]]; }
+    // важные точки сцены
+    var key = [[0, 0, 0], [0, 0, Z0], [F.x[0], F.y[0], 0], [M.A[0], M.A[1], M.A[2] - GROUND]];
+    for (i = 0; i < n; i += 4) key.push([F.x[i], F.y[i], F.z[i] - GROUND]);
+    if (!doFit && !CAM.dragging) {
+      // кадр не меняем, пока всё помещается; перекадрируем, только если что-то вышло за край
+      for (i = 0; i < key.length; i++) { q = P(key[i][0], key[i][1], key[i][2]); if (q[0] < 16 || q[0] > w - 16 || q[1] < padT - 12 || q[1] > h - padB + 12) { doFit = true; head = 0.7; keep = true; break; } }
+    }
+    var q;
+    if (doFit) {
+      fr = keep ? { cx: fr.cx, cy: fr.cy, cz: fr.cz, Dc: fr.Dc, sc: 1 } : { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, cz: maxZ / 2, Dc: 3 * Math.max(maxX - minX, maxY - minY, maxZ * CAM.zx, 10), sc: 1 };
+      var um = 1e-6, vm = 1e-6;
+      key.forEach(function (kp) { var a = proj(kp[0], kp[1], kp[2]); um = Math.max(um, Math.abs(a[0])); vm = Math.max(vm, Math.abs(a[1])); });
+      fr.sc = head * Math.min((w / 2 - padX) / um, ((h - padT - padB) / 2) / vm);
+      CAM.fit = fr; CAM.refit = false;
+    }
+
+    // земля: плоскость, сетка, кольца дальности вокруг стрелка
+    var g = [P(minX, minY, 0), P(maxX, minY, 0), P(maxX, maxY, 0), P(minX, maxY, 0)];
+    ctx.fillStyle = C.line; ctx.globalAlpha = .35; ctx.beginPath(); ctx.moveTo(g[0][0], g[0][1]);
+    for (i = 1; i < 4; i++) ctx.lineTo(g[i][0], g[i][1]);
+    ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(g[0][0], g[0][1]); for (i = 1; i < 4; i++) ctx.lineTo(g[i][0], g[i][1]); ctx.closePath(); ctx.stroke();
+    var gs = (maxX - minX > 90 || maxY - minY > 90) ? 20 : 10, gv, a2, b2;
+    ctx.setLineDash([2, 6]);
+    for (gv = Math.ceil(minX / gs) * gs; gv <= maxX; gv += gs) { a2 = P(gv, minY, 0); b2 = P(gv, maxY, 0); ctx.beginPath(); ctx.moveTo(a2[0], a2[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke(); }
+    for (gv = Math.ceil(minY / gs) * gs; gv <= maxY; gv += gs) { a2 = P(minX, gv, 0); b2 = P(maxX, gv, 0); ctx.beginPath(); ctx.moveTo(a2[0], a2[1]); ctx.lineTo(b2[0], b2[1]); ctx.stroke(); }
+    ctx.setLineDash([]);
+    ctx.strokeStyle = C.ink2; ctx.globalAlpha = .55; ctx.lineWidth = 1.2;
+    for (var r = 10; r <= maxR + 4; r += 10) {
+      ctx.beginPath();
+      for (i = 0; i <= 72; i++) { var aa = i * Math.PI / 36, rp = P(r * Math.sin(aa), r * Math.cos(aa), 0); if (i === 0) ctx.moveTo(rp[0], rp[1]); else ctx.lineTo(rp[0], rp[1]); }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    for (r = 10; r <= maxR + 4; r += 10) {
+      var lp = P(r * sth, -r * cth, 0);     // точка кольца, ближайшая к камере
+      if (lp[0] > 20 && lp[0] < w - 20 && lp[1] > 16 && lp[1] < h - 16) lab(ctx, C, r + ' м', lp[0], lp[1] + 11, '12px ' + C.mono, C.ink2, 'center', 'middle');
+    }
+
+    // траектория
+    var px = [], py = [], gx = [], gy = [];
+    for (i = 0; i < n; i++) { q = P(F.x[i], F.y[i], F.z[i] - GROUND); px.push(q[0]); py.push(q[1]); q = P(F.x[i], F.y[i], 0); gx.push(q[0]); gy.push(q[1]); }
+    // тень на земле
+    ctx.strokeStyle = C.ink2; ctx.globalAlpha = .5; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(gx[0], gy[0]); for (i = 1; i < n; i++) ctx.lineTo(gx[i], gy[i]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+    // высота над землёй: линии вниз каждые полсекунды
+    var step = F.T > 3 ? 1 : 0.5, tt, k;
+    ctx.strokeStyle = C.ink2; ctx.lineWidth = 1; ctx.globalAlpha = .6;
+    for (tt = step; tt < F.T - 0.05; tt += step) { k = Math.round(tt / DT); ctx.beginPath(); ctx.moveTo(px[k], py[k]); ctx.lineTo(gx[k], gy[k]); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    strokeWindow(ctx, C, px, py, 15);
+    strokeFlight(ctx, C, px, py, 5);
+    var ia = Math.max(1, Math.round(n * 0.18));
+    ctx.fillStyle = C.ink; arrowHead(ctx, px[ia], py[ia], Math.atan2(py[ia] - py[ia - 1], px[ia] - px[ia - 1]), 11);
+    for (tt = step; tt < F.T - 0.05; tt += step) {
+      k = Math.round(tt / DT);
+      ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(px[k], py[k], 3.2, 0, Math.PI * 2); ctx.fill();
+      if (Math.abs(tt - Math.round(tt)) < 1e-6) lab(ctx, C, fmt(tt, 0) + ' с', px[k] + 10, py[k] - 9, '12px ' + C.mono, C.ink2, 'left', 'middle');
+    }
+
+    // стрелок: стойка до земли, ствол
+    var bar = P(0, 0, Z0), sg = P(0, 0, 0);
+    ctx.strokeStyle = C.accent; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(sg[0], sg[1]); ctx.lineTo(bar[0], bar[1]); ctx.stroke();
+    ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(sg[0], sg[1], 4, 0, Math.PI * 2); ctx.fill();
+
+    // машинка и падение
+    var mg0 = P(F.x[0], F.y[0], 0);
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(mg0[0], mg0[1]); ctx.lineTo(px[0], py[0]); ctx.stroke();
+    ctx.fillStyle = C.ink; ctx.fillRect(mg0[0] - 6, mg0[1] - 6, 12, 12);
+    var ml = mg0[0] > w - 110;
+    lab(ctx, C, 'машинка', mg0[0] + (ml ? -11 : 11), mg0[1] + 14, '600 13px ' + C.body, C.ink, ml ? 'right' : 'left');
+    var l1 = [px[n - 1], py[n - 1]];
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.beginPath();
+    ctx.moveTo(l1[0] - 6, l1[1] - 6); ctx.lineTo(l1[0] + 6, l1[1] + 6); ctx.moveTo(l1[0] + 6, l1[1] - 6); ctx.lineTo(l1[0] - 6, l1[1] + 6); ctx.stroke();
+    var fl = l1[0] > w - 90; lab(ctx, C, 'падение', l1[0] + (fl ? -11 : 11), l1[1] + 14, '600 13px ' + C.body, C.ink, fl ? 'right' : 'left');
+
+    // линия прицеливания, упреждение, выстрел, лучшее место
+    var cp = (u === null) ? M.P0 : posAt(F, tauAnim(u));
+    var cs = P(cp[0], cp[1], cp[2] - GROUND), as = P(M.A[0], M.A[1], M.A[2] - GROUND);
+    ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bar[0], bar[1]); ctx.lineTo(as[0], as[1]); ctx.stroke();
+    var ll = Math.hypot(as[0] - cs[0], as[1] - cs[1]);
+    if (ll > 14) {
+      ctx.strokeStyle = C.ink; ctx.fillStyle = C.ink; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(cs[0], cs[1]); ctx.lineTo(as[0] - (as[0] - cs[0]) / ll * 11, as[1] - (as[1] - cs[1]) / ll * 11); ctx.stroke();
+      arrowHead(ctx, as[0], as[1], Math.atan2(as[1] - cs[1], as[0] - cs[0]), 11);
+    }
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(as[0], as[1], 10, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    var nearBest = false;
+    if (PR.best >= 0) {
+      var bp = posAt(F, PR.tau[PR.best]), bs = P(bp[0], bp[1], bp[2] - GROUND);
+      ctx.strokeStyle = C.good; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(bs[0], bs[1], 11, 0, Math.PI * 2); ctx.stroke();
+      nearBest = Math.hypot(bs[0] - cs[0], bs[1] - cs[1]) < 60;
+      if (!nearBest) lab(ctx, C, 'лучшее место', clamp(bs[0], 50, w - 50), bs[1] - 18, '600 13px ' + C.body, C.good, 'center');
+    }
+    ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(cs[0], cs[1], 8, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = C.panel; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cs[0], cs[1], 8, 0, Math.PI * 2); ctx.stroke();
+    var tl = cs[0] > w * 0.55, lx = cs[0] + (tl ? -16 : 16), ta = tl ? 'right' : 'left';
+    lab(ctx, C, 'выстрел ' + fmt(M.tauS, 1) + ' с' + (nearBest ? ' · лучшее место' : ''), lx, clamp(cs[1] - 24, 22, h - 40), '600 13px ' + C.body, nearBest ? C.good : C.ink, ta);
+    lab(ctx, C, 'упреждение ' + fmt(M.leadPath, 1) + ' м' + (Math.abs(M.vertLead) >= 0.05 ? ', по высоте ' + vertText(M.vertLead) : ''), lx, clamp(cs[1] - 8, 38, h - 24), '600 13px ' + C.mono, C.ink, ta);
+
+    // заряд в полёте
+    if (u !== null) {
+      var qx2 = bar[0] + (as[0] - bar[0]) * u, qy2 = bar[1] + (as[1] - bar[1]) * u;
+      ctx.strokeStyle = C.accent; ctx.lineWidth = 4; ctx.globalAlpha = .5;
+      ctx.beginPath(); ctx.moveTo(bar[0] + (as[0] - bar[0]) * Math.max(0, u - .12), bar[1] + (as[1] - bar[1]) * Math.max(0, u - .12)); ctx.lineTo(qx2, qy2); ctx.stroke();
+      ctx.globalAlpha = 1; ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(qx2, qy2, 4, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(bar[0], bar[1], 7, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = C.panel; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(bar[0], bar[1], 7, 0, Math.PI * 2); ctx.stroke();
+    lab(ctx, C, S.zs > 0 ? 'стрелок, +' + fmt(S.zs, 1) + ' м' : 'стрелок', bar[0] + 11, bar[1] + 20, '600 13px ' + C.body, C.accent, 'left');
+
+    // компас: куда на схеме «0°» (север)
+    var o0 = proj(0, 0, 0), o1 = proj(0, 10, 0), cdx = o1[0] - o0[0], cdy = -(o1[1] - o0[1]), cl = Math.hypot(cdx, cdy);
+    var ccx = 40, ccy = h - 34;
+    if (cl > 0.02) {
+      cdx /= cl; cdy /= cl;
+      ctx.strokeStyle = C.ink2; ctx.fillStyle = C.ink2; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(ccx, ccy); ctx.lineTo(ccx + cdx * 22, ccy + cdy * 22); ctx.stroke();
+      arrowHead(ctx, ccx + cdx * 22, ccy + cdy * 22, Math.atan2(cdy, cdx), 8);
+      lab(ctx, C, 'С', ccx + cdx * 34, ccy + cdy * 34, '600 12px ' + C.mono, C.ink2, 'center', 'middle');
+    }
+  }
+
+  // камера: перетаскивание вращает, колесо приближает
+  (function () {
+    var cv = $('scene'), drag = null;
+    $('zxBtn').addEventListener('click', function () { CAM.refit = true; CAM.zx = CAM.zx === 1 ? 2 : 1; $('zxBtn').textContent = 'Высота ×' + CAM.zx; if (M) drawAll(); });
+    cv.addEventListener('pointerdown', function (e) { drag = { x: e.clientX, y: e.clientY, yaw: CAM.yaw, pitch: CAM.pitch }; CAM.dragging = true; try { cv.setPointerCapture(e.pointerId); } catch (x) {} });
+    cv.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      CAM.yaw = drag.yaw - (e.clientX - drag.x) * 0.4;
+      CAM.pitch = clamp(drag.pitch + (e.clientY - drag.y) * 0.3, 3, 90);
+      if (M) drawAll();
+    });
+    cv.addEventListener('pointerup', function () { drag = null; CAM.dragging = false; });
+    cv.addEventListener('pointercancel', function () { drag = null; CAM.dragging = false; });
+    cv.addEventListener('wheel', function (e) { e.preventDefault(); CAM.zoom = clamp(CAM.zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1), 0.6, 3); if (M) drawAll(); }, { passive: false });
+    Array.prototype.slice.call(document.querySelectorAll('[data-cam]')).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var c = b.getAttribute('data-cam');
+        if (c === 'iso') { CAM.yaw = -28; CAM.pitch = 38; }
+        else if (c === 'top') { CAM.yaw = 0; CAM.pitch = 90; }
+        else if (c === 'side') { CAM.yaw = 0; CAM.pitch = 4; }
+        else if (c === 'line' && M) {
+          var eh = Math.hypot(M.A[0], M.A[1]);
+          CAM.yaw = eh > 0.05 ? Math.atan2(-M.A[0] / eh, M.A[1] / eh) * 180 / Math.PI : 0; CAM.pitch = 14;
+        }
+        CAM.zoom = 1; CAM.refit = true; if (M) drawAll();
+      });
+    });
+  })();
+
+  /* ---------- площадка: машинка, стрелок, курс ---------- */
+  var PAD = 50;   // площадка от −50 до +50 м по обеим осям
+  function padScale() { var cv = $('pad'); return Math.min(cv.clientWidth, cv.clientHeight) / (2 * PAD); }
+  function padPts() {
+    var cv = $('pad'), w = cv.clientWidth, h = cv.clientHeight, s = padScale(), a = S.a0 * Math.PI / 180, Lc = 14 * s;
+    var mx = w / 2 + S.mx * s, my = h / 2 - S.my * s;
+    return { m: [mx, my], s: [w / 2 + S.sx * s, h / 2 - S.sy * s], c: [mx + Math.sin(a) * Lc, my - Math.cos(a) * Lc] };
+  }
+  function drawPad() {
+    var o = setup($('pad')), ctx = o.ctx, w = o.w, h = o.h, C = pal(), s = Math.min(w, h) / (2 * PAD), i, g;
+    function X(x) { return w / 2 + x * s; }
+    function Y(y) { return h / 2 - y * s; }
+    ctx.fillStyle = C.line; ctx.globalAlpha = .22; ctx.fillRect(0, 0, w, h); ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+    for (g = -PAD; g <= PAD; g += 10) {
+      ctx.strokeStyle = g === 0 ? C.ink2 : C.line; ctx.globalAlpha = g === 0 ? .7 : 1;
+      ctx.beginPath(); ctx.moveTo(X(g), 0); ctx.lineTo(X(g), h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, Y(g)); ctx.lineTo(w, Y(g)); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    for (g = -40; g <= 40; g += 20) {
+      if (g === 0) continue;
+      lab(ctx, C, String(g), X(g), h - 8, '11px ' + C.mono, C.ink2, 'center', 'middle');
+      lab(ctx, C, String(g), 12, Y(g), '11px ' + C.mono, C.ink2, 'center', 'middle');
+    }
+    // след тарелки на земле
+    var n = F.n, px = [], py = [];
+    for (i = 0; i < n; i++) { px.push(X(F.x[i] + S.sx)); py.push(Y(F.y[i] + S.sy)); }
+    strokeWindow(ctx, C, px, py, 9);
+    strokeFlight(ctx, C, px, py, 3);
+    var pt = padPts();
+    // линия «машинка — стрелок»
+    ctx.strokeStyle = C.ink2; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(pt.m[0], pt.m[1]); ctx.lineTo(pt.s[0], pt.s[1]); ctx.stroke(); ctx.setLineDash([]);
+    var dist = Math.hypot(S.mx - S.sx, S.my - S.sy);
+    if (dist > 8) {
+      var ddx = pt.m[0] - pt.s[0], ddy = pt.m[1] - pt.s[1], dl = Math.hypot(ddx, ddy) || 1, sgn = ddx >= 0 ? 1 : -1;
+      lab(ctx, C, fmt(dist, 0) + ' м', pt.s[0] + ddx * 0.5 + (ddy / dl) * 14 * sgn, pt.s[1] + ddy * 0.5 - (ddx / dl) * 14 * sgn, '600 12px ' + C.mono, C.ink2, 'center', 'middle');
+    }
+    // курс вылета: стрелка из машинки
+    var ang = Math.atan2(pt.c[1] - pt.m[1], pt.c[0] - pt.m[0]);
+    ctx.strokeStyle = C.clay; ctx.fillStyle = C.clay; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(pt.m[0], pt.m[1]); ctx.lineTo(pt.c[0] - Math.cos(ang) * 8, pt.c[1] - Math.sin(ang) * 8); ctx.stroke();
+    arrowHead(ctx, pt.c[0], pt.c[1], ang, 12);
+    ctx.beginPath(); ctx.arc(pt.c[0], pt.c[1], 8, 0, Math.PI * 2); ctx.globalAlpha = .35; ctx.fill(); ctx.globalAlpha = 1;
+    var cxl = Math.cos(ang), cyl = Math.sin(ang);
+    lab(ctx, C, 'курс ' + fmt(S.a0, 0) + '°', clamp(pt.c[0] + cxl * 18, 36, w - 36), clamp(pt.c[1] + cyl * 18, 14, h - 14), '600 12px ' + C.mono, C.clay, 'center', 'middle');
+    // машинка
+    ctx.fillStyle = C.ink; ctx.fillRect(pt.m[0] - 7, pt.m[1] - 7, 14, 14);
+    ctx.strokeStyle = C.panel; ctx.lineWidth = 2; ctx.strokeRect(pt.m[0] - 7, pt.m[1] - 7, 14, 14);
+    lab(ctx, C, 'машинка', pt.m[0], pt.m[1] + (Math.sin(ang) > 0.3 ? -14 : 22), '600 12px ' + C.body, C.ink, 'center');
+    // стрелок
+    ctx.fillStyle = C.accent; ctx.beginPath(); ctx.arc(pt.s[0], pt.s[1], 8, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = C.panel; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(pt.s[0], pt.s[1], 8, 0, Math.PI * 2); ctx.stroke();
+    lab(ctx, C, 'стрелок', pt.s[0], pt.s[1] + 22, '600 12px ' + C.body, C.accent, 'center');
+    lab(ctx, C, 'С', w / 2, 10, '700 13px ' + C.body, C.ink, 'center', 'middle');
+    lab(ctx, C, 'Ю', w / 2, h - 10, '700 13px ' + C.body, C.ink, 'center', 'middle');
+    lab(ctx, C, 'З', 10, h / 2, '700 13px ' + C.body, C.ink, 'center', 'middle');
+    lab(ctx, C, 'В', w - 10, h / 2, '700 13px ' + C.body, C.ink, 'center', 'middle');
+  }
+  (function () {
+    var cv = $('pad'), drag = null;
+    function where(e) { var r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+    cv.addEventListener('pointerdown', function (e) {
+      var p = where(e), pt = padPts(), best = null, bd = 22;
+      ['c', 'm', 's'].forEach(function (k) { var d = Math.hypot(p[0] - pt[k][0], p[1] - pt[k][1]); if (d < bd) { bd = d; best = k; } });
+      if (!best) return;
+      drag = best; try { cv.setPointerCapture(e.pointerId); } catch (x) {}
+    });
+    cv.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      var p = where(e), s = padScale(), w = cv.clientWidth, h = cv.clientHeight;
+      var x = clamp(Math.round((p[0] - w / 2) / s), -PAD, PAD), y = clamp(Math.round(-(p[1] - h / 2) / s), -PAD, PAD);
+      if (drag === 'm') { setVal('mx', x); setVal('my', y); }
+      else if (drag === 's') { setVal('sx', x); setVal('sy', y); }
+      else {
+        var dx = (p[0] - w / 2) / s - S.mx, dy = -(p[1] - h / 2) / s - S.my;
+        if (Math.hypot(dx, dy) < 0.5) return;
+        setVal('a0', (Math.round(Math.atan2(dx, dy) * 180 / Math.PI) + 360) % 360);
+      }
+      preset = null; shotRes = null; anim = null; update();
+    });
+    function end() { drag = null; }
+    cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  })();
+
+  /* ---------- лента сложности ---------- */
+  var RB = { padL: 16, padR: 16 };
+  function drawRibbon() {
+    var o = setup($('ribbon')), ctx = o.ctx, w = o.w, h = o.h, C = pal(), m = PR.n - 1, i;
+    var x0 = RB.padL, x1 = w - RB.padR, bw = (x1 - x0), yT = 42, bh = 26;
+    function TX(tau) { return x0 + tau / F.T * bw; }
+    for (i = 0; i < m; i++) {
+      ctx.globalAlpha = PR.ok[i] ? 1 : .35; ctx.fillStyle = C.lv[PR.level[i]];
+      ctx.fillRect(x0 + bw * i / m, yT, bw / m + 0.6, bh);
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = C.ink2; ctx.lineWidth = 1; ctx.strokeRect(x0 + .5, yT + .5, bw - 1, bh - 1);
+
+    // лучшее окно
+    if (PR.best >= 0) {
+      var a = TX(PR.tau[PR.winLo]), b = TX(PR.tau[PR.winHi]);
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 3; ctx.strokeRect(a, yT - 3, Math.max(4, b - a), bh + 6);
+      lab(ctx, C, 'лучшее окно', clamp((a + b) / 2, 44, w - 44), yT - 11, '600 13px ' + C.body, C.good, 'center', 'middle');
+    }
+    // риски времени и дистанции
+    var step = F.T > 3.2 ? 1 : 0.5, tt;
+    for (tt = 0; tt <= F.T + 1e-6; tt += step) {
+      var tx = TX(tt), k = tIdx(tt);
+      ctx.strokeStyle = C.ink2; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tx, yT + bh); ctx.lineTo(tx, yT + bh + 5); ctx.stroke();
+      var al = tt < 0.01 ? 'left' : (tt > F.T - 0.01 ? 'right' : 'center');
+      lab(ctx, C, fmt(tt, 1) + ' с', tx, yT + bh + 17, '12px ' + C.mono, C.ink, al, 'middle');
+      lab(ctx, C, fmt(PR.d[k], 0) + ' м', tx, yT + bh + 31, '12px ' + C.mono, C.ink2, al, 'middle');
+    }
+    // метка выстрела
+    var mxp = TX(Math.min(M.tauS, F.T));
+    ctx.fillStyle = C.ink; ctx.strokeStyle = C.panel; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(mxp, yT + bh + 2); ctx.lineTo(mxp - 8, yT + bh + 13); ctx.lineTo(mxp + 8, yT + bh + 13); ctx.closePath();
+    ctx.fillRect(mxp - 1.5, yT - 4, 3, bh + 8);
+    ctx.fill(); ctx.stroke();
+    lab(ctx, C, 'выстрел', clamp(mxp, 34, w - 34), 10, '600 13px ' + C.body, C.ink, 'center', 'middle');
+  }
+  function ribbonPick(ev) {
+    var r = $('ribbon').getBoundingClientRect(), f = (ev.clientX - r.left - RB.padL) / (r.width - RB.padL - RB.padR);
+    setVal0(clamp(Math.round(f * 200) / 2, 2, 96));
+  }
+  function goBest() { if (PR && PR.best >= 0) setVal0(clamp(Math.round(PR.tau[PR.best] / F.T * 200) / 2, 2, 96)); }
+  function setVal0(v) { S.moment = v; $('moment').value = String(v); shotRes = null; anim = null; update(); }
+  var dragging = false;
+  $('ribbon').addEventListener('pointerdown', function (e) { dragging = true; try { $('ribbon').setPointerCapture(e.pointerId); } catch (x) {} ribbonPick(e); });
+  $('ribbon').addEventListener('pointermove', function (e) { if (dragging) ribbonPick(e); });
+  $('ribbon').addEventListener('pointerup', function () { dragging = false; });
+  $('ribbon').addEventListener('pointercancel', function () { dragging = false; });
+
+  /* ---------- вид у мишени ---------- */
+  var gauss = function () {
+    var a = 0, b = 0; while (a === 0) a = Math.random(); while (b === 0) b = Math.random();
+    return Math.sqrt(-2 * Math.log(a)) * Math.cos(2 * Math.PI * b);
+  };
+  function centerOffset() {
+    var e = S.errLead / 100, tiny = M.sinG < 0.02;
+    return { x: tiny ? 0 : e * M.lateralV, y: (tiny ? 0 : e * M.upV) + S.errH / 100 };
+  }
+  function drawZoom() {
+    var o = setup($('zoom')), ctx = o.ctx, w = o.w, h = o.h, C = pal(), m = M;
+    var half = Math.min(2.2, Math.max(0.3, m.D50 * 0.9)), sc = (Math.min(w, h) / 2 - 10) / half, cx = w / 2, cy = h / 2, i;
+    function X(x) { return cx + x * sc; }
+    function Y(y) { return cy - y * sc; }
+    var steps = [0.05, 0.1, 0.2, 0.25, 0.5], step = 0.5;
+    for (i = 0; i < steps.length; i++) { if (half / steps[i] <= 6) { step = steps[i]; break; } }
+    ctx.strokeStyle = C.line; ctx.lineWidth = 1;
+    for (var g = -Math.floor(half / step) * step; g <= half + 1e-9; g += step) {
+      ctx.globalAlpha = Math.abs(g) < 1e-9 ? 1 : .55;
+      ctx.beginPath(); ctx.moveTo(X(g), Y(-half)); ctx.lineTo(X(g), Y(half)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(X(-half), Y(g)); ctx.lineTo(X(half), Y(g)); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    function ring(r, color, fa, lw, dash) {
+      ctx.beginPath(); ctx.arc(X(0), Y(0), r * sc, 0, Math.PI * 2);
+      if (fa) { ctx.globalAlpha = fa; ctx.fillStyle = color; ctx.fill(); ctx.globalAlpha = 1; }
+      ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.setLineDash(dash || []); ctx.stroke(); ctx.setLineDash([]);
+    }
+    var ang = -0.8, ca = Math.cos(ang), sa = Math.sin(ang);
+    if (m.rYellow !== null) ring(m.rYellow, C.warn, .26, 1.5);
+    if (m.rGreen !== null) ring(m.rGreen, C.good, .34, 1.5);
+    if (m.rChip !== null) ring(m.rChip, C.ink2, 0, 1, [4, 4]);
+    if (m.rYellow !== null) lab(ctx, C, 'вероятно ' + cm(m.rYellow), X(0), Y(m.rYellow) - 6, '600 12px ' + C.body, C.warn, 'center');
+    if (m.rGreen !== null) lab(ctx, C, 'надёжно ' + cm(m.rGreen), X(0), Y(m.rGreen) + 15, '600 12px ' + C.body, C.good, 'center');
+
+    ctx.fillStyle = C.clay; ctx.beginPath(); ctx.arc(X(0), Y(0), m.a * sc, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(X(0), Y(0), m.a * sc, 0, Math.PI * 2); ctx.stroke();
+
+    var lv = m.lateralV, uv = m.upV, mag = Math.hypot(lv, uv), parts = [];
+    if (Math.abs(lv) >= 0.05) parts.push(lv > 0 ? 'вправо' : 'влево');
+    if (Math.abs(uv) >= 0.05) parts.push(uv > 0 ? 'вверх' : 'вниз');
+    if (parts.length && mag > 0) {
+      var dx = lv / mag, dy = -uv / mag, x0 = X(0) + dx * (m.a * sc + 5), y0 = Y(0) + dy * (m.a * sc + 5), x1 = x0 + dx * 30, y1 = y0 + dy * 30;
+      ctx.strokeStyle = C.ink; ctx.fillStyle = C.ink; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); arrowHead(ctx, x1, y1, Math.atan2(dy, dx), 10);
+    }
+    var c = centerOffset();
+    ctx.strokeStyle = C.accent; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+    ctx.beginPath(); ctx.arc(X(c.x), Y(c.y), m.D50 / 2 * sc, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.lineWidth = 2.5; ctx.beginPath();
+    ctx.moveTo(X(c.x) - 9, Y(c.y)); ctx.lineTo(X(c.x) + 9, Y(c.y)); ctx.moveTo(X(c.x), Y(c.y) - 9); ctx.lineTo(X(c.x), Y(c.y) + 9); ctx.stroke();
+
+    if (shotRes && !anim) {
+      ctx.fillStyle = C.ink;
+      shotRes.pellets.forEach(function (p) {
+        var x = X(c.x + p[0]), y = Y(c.y + p[1]);
+        if (x < 0 || y < 0 || x > w || y > h) return;
+        ctx.beginPath(); ctx.arc(x, y, 1.8, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.strokeStyle = C.good; ctx.lineWidth = 2;
+      shotRes.hitPts.forEach(function (p) { ctx.beginPath(); ctx.arc(X(c.x + p[0]), Y(c.y + p[1]), 5, 0, Math.PI * 2); ctx.stroke(); });
+    }
+    var barM = step * 2;
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(10, h - 14); ctx.lineTo(10 + barM * sc, h - 14); ctx.stroke();
+    lab(ctx, C, fmt(barM * 100, 0) + ' см', 10, h - 22, '12px ' + C.mono, C.ink, 'left');
+    lab(ctx, C, parts.length ? 'тарелка летит: ' + parts.join(', ') : 'тарелка летит вдоль выстрела', w - 10, h - 10, '12px ' + C.mono, C.ink2, 'right');
+  }
+
+  /* ---------- тексты ---------- */
+  function row(dt, dd) { return '<div><dt>' + dt + '</dt><dd>' + dd + '</dd></div>'; }
+  function buildMeter() {
+    var el = $('meter'), lg = $('legGrad'), i;
+    for (i = 0; i < 8; i++) { var sp = document.createElement('span'); sp.style.setProperty('--lvc', 'var(--lv' + i + ')'); el.appendChild(sp); }
+    for (i = 0; i < 8; i += 1) { var ic = document.createElement('i'); ic.style.setProperty('--lvc', 'var(--lv' + i + ')'); lg.appendChild(ic); }
+    var t = document.createElement('span'); t.textContent = 'сложнее'; lg.appendChild(t);
+  }
+  buildMeter();
+
+  function fillTexts() {
+    var m = M, d = parseFloat(S.clay), segs = $('meter').children, i;
+    $('lvlName').textContent = LEVELS[m.level];
+    for (i = 0; i < 8; i++) segs[i].className = (i === m.level) ? 'on' : '';
+    if (m.rGreen === null) {
+      $('lvlSub').textContent = 'Надёжного разбития нет даже при точной наводке: осыпь слишком редкая. Возьмите более тугой чок, крупнее навеску или стреляйте ближе.';
+    } else {
+      $('lvlSub').textContent = 'Нужно упреждение ' + fmt(m.leadPath / d, 1) + ' диаметра тарелки, а допустимая ошибка всего ±' + cm(m.rGreen) + '. Чем меньше это отношение, тем проще выстрел.';
+    }
+    $('aimMain').textContent = fmt(m.leadPath, 2) + ' м вперёд';
+    var sub = [];
+    if (Math.abs(m.vertLead) >= 0.005) sub.push('по высоте ' + vertText(m.vertLead));
+    sub.push(fmt(m.leadPath / d, 1) + ' диаметра тарелки');
+    sub.push(fmt(m.leadAng * 180 / Math.PI, 1) + '° от тарелки');
+    $('aimSub').textContent = sub.join(' · ');
+
+    // лучшее место
+    var bt = $('bestText'), bb = $('bestBtn');
+    bb.hidden = true;
+    if (PR.best < 0) {
+      bt.textContent = 'На этом полёте нет места, где выстрел возможен: тарелка слишком далеко, низко или слишком быстро падает.';
+    } else {
+      var cur = tIdx(m.tauS), inWin = cur >= PR.winLo && cur <= PR.winHi, tb = PR.tau[PR.best];
+      if (inWin) {
+        bt.textContent = 'Вы стреляете в лучшем окне полёта: через ' + fmt(PR.tau[PR.winLo], 1) + '–' + fmt(PR.tau[PR.winHi], 1) + ' с после вылета, сложность «' + LEVELS[PR.level[PR.best]] + '».';
+      } else {
+        bt.textContent = 'Лучшее место: через ' + fmt(tb, 1) + ' с после вылета, на ' + fmt(PR.d[PR.best], 0) + ' м, сложность «' + LEVELS[PR.level[PR.best]] + '».' + ' Сейчас: «' + LEVELS[m.level] + '».';
+        bb.hidden = false;
+      }
+    }
+
+    var pdx = S.mx - S.sx, pdy = S.my - S.sy, pd = Math.hypot(pdx, pdy), pb = (Math.round(Math.atan2(pdx, pdy) * 180 / Math.PI) + 360) % 360;
+    $('padInfo').textContent = 'Дистанция до машинки ' + fmt(pd, 0) + ' м' + (pd > 0.5 ? ', машинка от стрелка на ' + fmt(pb, 0) + '° (' + dirWord(pb) + ')' : '') + '.';
+    $('flightSum').textContent = 'полёт ' + fmt(INFO.T, 1) + ' с · вершина ' + fmt(INFO.apexAbove, 1) + ' м · падает на ' + fmt(INFO.landDist, 0) + ' м · вылет ' + fmt(INFO.v0, 0) + ' м/с';
+    $('ribbonHint').textContent = 'нажмите на ленту или двигайте ползунок';
+    $('momentText').textContent = 'Выстрел через ' + fmt(m.tauS, 2) + ' с после вылета, тарелка на ' + fmt(m.R, 0) + ' м, дробь долетает за ' + fmt(m.t * 1000, 0) + ' мс' + (m.late ? '. К этому моменту тарелка уже упадёт.' : '');
+
+    var c = centerOffset(), r = Math.hypot(c.x, c.y), mu = m.mu(r), p = m.pOK(r), q = '';
+    q += row('Тарелка сейчас', fmt(m.R, 0) + ' м от вас, ' + fmt(m.h - GROUND, 1) + ' м над землёй');
+    q += row('Летит', fmt(m.speed, 0) + ' м/с, ' + alphaText(Math.round(m.alpha)) + ', ' + (m.climb >= 0 ? '↑ ' : '↓ ') + fmt(Math.abs(m.climb), 0) + '°');
+    q += row('Осыпь на встрече', '⌀ ' + fmt(m.D50, 2) + ' м (50 % заряда)');
+    q += row('Дробин на тарелке при точной наводке', '≈ ' + fmt(m.muCenter, 1));
+    q += row('Надёжная зона', m.rGreen === null ? 'нет' : '± ' + cm(m.rGreen));
+    q += row('Вероятная зона', m.rYellow === null ? 'нет' : '± ' + cm(m.rYellow));
+    $('quick').innerHTML = q;
+
+    var s2 = '';
+    s2 += row('Дистанция встречи (по прямой)', fmt(m.d, 1) + ' м');
+    s2 += row('Упреждение по горизонтали', fmt(m.leadHoriz, 2) + ' м');
+    s2 += row('Упреждение по высоте', vertText(m.vertLead));
+    s2 += row('Угол места: тарелка → прицел', fmt(m.elev0 * 180 / Math.PI, 1) + '° → ' + fmt(m.elevA * 180 / Math.PI, 1) + '°');
+    s2 += row('Падение за время полёта дроби', fmt(m.dropG * 100, 0) + ' см');
+    s2 += row('Ружьё бьёт выше на этой дистанции', fmt(m.gunOff * 100, 0) + ' см');
+    s2 += row('Держать по высоте относительно тарелки', vertText(m.hold));
+    s2 += row('Дробин в заряде', '≈ ' + fmt(m.N, 0));
+    s2 += row('Допуск упреждения по траектории', m.tolPath === null ? (m.rGreen === null ? 'нет' : 'не зависит') : '± ' + cm(m.tolPath));
+    s2 += row('Допуск по углу', m.rGreen === null ? 'нет' : '± ' + fmt(m.tolAng * 180 / Math.PI, 2) + '°');
+    s2 += row('Отношение упреждения к допуску', isFinite(m.ratio) ? fmt(m.ratio, 1) : '—');
+    s2 += row('С вашей ошибкой: дробин на тарелке', '≈ ' + fmt(mu, 1));
+    s2 += row('С вашей ошибкой: ' + S.minHits + '+ дробин', fmt(p * 100, 0) + ' %');
+    s2 += row('Полёт тарелки', fmt(INFO.T, 1) + ' с, вершина ' + fmt(INFO.apexAbove, 1) + ' м, падает на ' + fmt(INFO.landDist, 0) + ' м');
+    $('stats').innerHTML = s2;
+
+    var note = $('note');
+    note.className = 'note';
+    if (m.rGreen === null) { note.className = 'note alert'; note.textContent = 'Даже точный центр осыпи не даёт ' + S.minHits + ' дробин с вероятностью ' + S.conf + ' %.'; }
+    else if (m.sinG < 0.05) note.textContent = 'Тарелка идёт почти по линии выстрела: упреждение по траектории почти не влияет на попадание, важнее точность по высоте и дальности.';
+    else note.textContent = 'Круги вокруг тарелки показывают, насколько центр осыпи может отойти от центра тарелки.';
+
+    var v = $('verdict');
+    if (shotRes) {
+      var n = shotRes.hits;
+      v.className = 'verdict ' + (n >= S.minHits ? 'good' : (n >= 1 ? 'warn' : 'bad'));
+      v.textContent = 'Выстрел: на тарелке ' + n + ' ' + plural(n) + '. ' + (n >= S.minHits ? 'Разбита надёжно.' : (n >= 1 ? 'Скол или осечка, надёжности нет.' : 'Мимо.'));
+    } else if (anim) { v.className = 'verdict'; v.textContent = 'Выстрел идёт…'; }
+    else { v.className = 'verdict'; v.textContent = ''; }
+
+    presetBtns.forEach(function (pb) { pb[1].setAttribute('aria-pressed', preset === pb[0] ? 'true' : 'false'); });
+  }
+  $('bestBtn').addEventListener('click', function () {
+    if (PR.best >= 0) setVal0(clamp(Math.round(PR.tau[PR.best] / F.T * 200) / 2, 2, 96));
+  });
+
+  function drawAll() { var u = anim ? anim.u : null; drawScene(u); drawPad(); drawRibbon(); drawZoom(); }
+
+  /* ---------- выстрел ---------- */
+  function fire() {
+    var c = centerOffset(), pel = [], hitPts = [], i;
+    for (i = 0; i < M.N; i++) {
+      var dx = M.sigma * gauss(), dy = M.sigma * gauss(), gx = c.x + dx, gy = c.y + dy;
+      pel.push([dx, dy]);
+      if (gx * gx + gy * gy <= M.a * M.a) hitPts.push([dx, dy]);
+    }
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var pending = { pellets: pel, hitPts: hitPts, hits: hitPts.length };
+    shotRes = null;
+    if (reduce) { shotRes = pending; anim = null; update(); return; }
+    anim = { u: 0, t0: performance.now(), dur: 1500, pending: pending };
+    fillTexts(); requestAnimationFrame(step);
+  }
+  function step(now) {
+    if (!anim) return;
+    var u = Math.min(1, (now - anim.t0) / anim.dur); anim.u = u;
+    if (u >= 1) { shotRes = anim.pending; anim = null; update(); return; }
+    drawScene(u);
+    requestAnimationFrame(step);
+  }
+  $('fire').addEventListener('click', fire);
+
+  /* ---------- перерисовка ---------- */
+  var rafId = 0;
+  function redraw() { cancelAnimationFrame(rafId); rafId = requestAnimationFrame(function () { if (M) drawAll(); }); }
+  if (window.ResizeObserver) { var ro = new ResizeObserver(redraw); ['scene', 'pad', 'ribbon', 'zoom'].forEach(function (id) { ro.observe($(id)); }); }
+  else window.addEventListener('resize', redraw);
+  if (window.matchMedia) { var mq = window.matchMedia('(prefers-color-scheme: dark)'); if (mq.addEventListener) mq.addEventListener('change', redraw); }
+  if (window.MutationObserver) new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(redraw);
+
+  resetView(); goBest();
+})();
+</script>
+
+</body>
+</html>
